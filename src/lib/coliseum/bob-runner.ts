@@ -210,17 +210,34 @@ export async function runContender(
     try {
       if (process.platform === "win32") {
         // On Windows, .cmd shims cannot be spawned with shell:false (EINVAL).
-        // Route through cmd.exe /C with ONLY the fixed trusted flag string.
+        // Route through cmd.exe with ONLY the fixed trusted flag string.
         // The prompt is sent via stdin — never via the command line.
         const comspec = process.env.ComSpec ?? "cmd.exe";
-        // Build the shell command from fixed constant parts only.
-        // bobBin is the resolved .cmd path (trusted, not user input).
-        // Quote every argument so paths containing spaces (e.g. the worktree
-        // path passed to --workspace) are not split by cmd.exe.
-        const shellCmd = [`"${bobBin}"`, ...bobFixedArgs.map((a) => `"${a}"`)].join(" ");
+
+        // cmd.exe /C quoting rule:
+        //   When the argument after /C begins with a double-quote, cmd.exe
+        //   strips the OUTERMOST pair of quotes and then parses the remainder.
+        //   So a quoted executable path requires the outer wrapper:
+        //
+        //     /D /S /C ""C:\path\bob.cmd" run --workspace "D:\path with spaces\ws" ..."
+        //
+        // Only the executable and the workspace path (the only value that may
+        // contain spaces) need quoting.  All other tokens are simple flag
+        // strings with no spaces and need no quotes.
+        //
+        // Node passes each array element to CreateProcess verbatim (no extra
+        // escaping for elements that contain no backslash-before-quote
+        // sequences), so plain double-quote characters here reach cmd.exe as-is.
+        const inner =
+          `"${bobBin}" run --workspace "${contender.worktreePath}"` +
+          ` --mode agent --format stream-json` +
+          ` --max-cost 0.30 --max-turns 8 --disable-subagents --trust`;
+        // Wrap in outer quotes so cmd.exe /C parses the quoted executable correctly.
+        const cmdArg = `"${inner}"`;
+
         proc = spawn(
           /*turbopackIgnore: true*/ comspec,
-          ["/C", shellCmd],
+          ["/D", "/S", "/C", cmdArg],
           {
             env: process.env,
             shell: false,
