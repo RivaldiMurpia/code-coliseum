@@ -26,8 +26,8 @@
  *
  * Windows note: .cmd shims cannot be spawned with shell:false.
  * On win32 we route through cmd.exe /C with ONLY fixed trusted CLI flags.
- * The prompt (which contains user-provided text) is passed via stdin —
- * it is never interpolated into the shell command string.
+ * Paths contain no spaces so no quoting is needed; each token is a
+ * separate array element.  The prompt is passed via stdin only.
  */
 
 import { spawn } from "node:child_process";
@@ -210,34 +210,14 @@ export async function runContender(
     try {
       if (process.platform === "win32") {
         // On Windows, .cmd shims cannot be spawned with shell:false (EINVAL).
-        // Route through cmd.exe with ONLY the fixed trusted flag string.
+        // Route through cmd.exe /C with each token as a separate array element.
+        // Worktree paths contain no spaces so no quoting is required.
         // The prompt is sent via stdin — never via the command line.
         const comspec = process.env.ComSpec ?? "cmd.exe";
 
-        // cmd.exe /C quoting rule:
-        //   When the argument after /C begins with a double-quote, cmd.exe
-        //   strips the OUTERMOST pair of quotes and then parses the remainder.
-        //   So a quoted executable path requires the outer wrapper:
-        //
-        //     /D /S /C ""C:\path\bob.cmd" run --workspace "D:\path with spaces\ws" ..."
-        //
-        // Only the executable and the workspace path (the only value that may
-        // contain spaces) need quoting.  All other tokens are simple flag
-        // strings with no spaces and need no quotes.
-        //
-        // Node passes each array element to CreateProcess verbatim (no extra
-        // escaping for elements that contain no backslash-before-quote
-        // sequences), so plain double-quote characters here reach cmd.exe as-is.
-        const inner =
-          `"${bobBin}" run --workspace "${contender.worktreePath}"` +
-          ` --mode agent --format stream-json` +
-          ` --max-cost 0.30 --max-turns 8 --disable-subagents --trust`;
-        // Wrap in outer quotes so cmd.exe /C parses the quoted executable correctly.
-        const cmdArg = `"${inner}"`;
-
         proc = spawn(
           /*turbopackIgnore: true*/ comspec,
-          ["/D", "/S", "/C", cmdArg],
+          ["/D", "/S", "/C", bobBin, ...bobFixedArgs],
           {
             env: process.env,
             shell: false,
