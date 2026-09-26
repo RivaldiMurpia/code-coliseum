@@ -13,7 +13,9 @@
  *     --max-turns 8
  *     --disable-subagents
  *     --trust
- *     <prompt>
+ *
+ * The contender prompt is written to Bob's stdin (not passed as a CLI
+ * argument) so that user-provided text never touches the shell command line.
  *
  * Resolution: Bob is resolved from PATH in a Windows-safe way using
  * `where.exe` on Windows and `which` on other platforms.
@@ -21,6 +23,11 @@
  *
  * Credentials: the child process inherits the parent's environment.
  * No API keys are placed in source code.
+ *
+ * Windows note: .cmd shims cannot be spawned with shell:false.
+ * On win32 we route through cmd.exe /C with ONLY fixed trusted CLI flags.
+ * The prompt (which contains user-provided text) is passed via stdin —
+ * it is never interpolated into the shell command string.
  */
 
 import { spawn } from "node:child_process";
@@ -39,22 +46,32 @@ const execFile = promisify(execFileCb);
 /**
  * Resolve the `bob` executable from PATH.
  *
- * On Windows we call `where.exe bob.cmd` then `where.exe bob`; on Unix
- * we call `which bob`. Falls back to the bare name if resolution fails so
- * the error from spawn is descriptive.
+ * On Windows, `where.exe bob` may return both the extensionless Unix-style
+ * shim and the `bob.cmd` batch wrapper on separate lines.  Only `bob.cmd`
+ * can be launched reliably via cmd.exe /C; the extensionless shim produces
+ * EINVAL.  We therefore scan all `where.exe` output lines and prefer the
+ * first `.cmd` entry.  If none is found we fall back to a well-known npm
+ * global location, then to the bare "bob.cmd" name.
+ *
+ * On Unix we call `which bob` and fall back to "bob".
  */
 async function resolveBobBinary(): Promise<string> {
   if (process.platform === "win32") {
-    for (const candidate of ["bob.cmd", "bob"]) {
-      try {
-        const { stdout } = await execFile("where.exe", [candidate]);
-        const first = stdout.trim().split(/\r?\n/)[0]?.trim();
-        if (first && existsSync(/*turbopackIgnore: true*/ first)) return first;
-      } catch {
-        // not found via this candidate — try next
-      }
+    try {
+      const { stdout } = await execFile("where.exe", ["bob"]);
+      const lines = stdout
+        .trim()
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+      // Prefer the .cmd shim — it is the correct Windows entry point
+      const cmdLine = lines.find((l) => l.toLowerCase().endsWith(".cmd"));
+      const chosen = cmdLine ?? lines[0];
+      if (chosen && existsSync(/*turbopackIgnore: true*/ chosen)) return chosen;
+    } catch {
+      // where.exe failed — fall through to defaults
     }
-    // Last resort: try common npm global paths
+    // Fallback: npm global bin next to the Node executable
     const npmGlobalBin = path.join(
       path.dirname(process.execPath),
       "bob.cmd"
@@ -160,6 +177,10 @@ export interface RunContenderResult {
  *
  * Returns a Promise that resolves when the Bob process exits (regardless of
  * exit code). Never throws — failures are encoded in the result.
+ *
+ * Security: the contender prompt (which contains user-provided feature
+ * request text) is written to Bob's stdin.  It is never included in the
+ * shell command string or argument vector passed to cmd.exe.
  */
 export async function runContender(
   contender: ContenderBattleState,
@@ -168,7 +189,8 @@ export async function runContender(
 ): Promise<RunContenderResult> {
   const prompt = buildPrompt(contender.id, featureRequest);
 
-  const args = [
+  // Fixed, trusted CLI flags only — no user text here.
+  const bobFixedArgs = [
     "run",
     "--workspace", contender.worktreePath,
     "--mode", "agent",
@@ -177,7 +199,6 @@ export async function runContender(
     "--max-turns", "8",
     "--disable-subagents",
     "--trust",
-    prompt,
   ];
 
   const events: BobEvent[] = [];
@@ -187,19 +208,47 @@ export async function runContender(
     let proc: ReturnType<typeof spawn>;
 
     try {
-      proc = spawn(bobBin, args, {
-        // Inherit full environment so API keys / proxy settings flow through
-        env: process.env,
-        // No shell — argument array is passed directly to the OS
-        shell: false,
-        // stdout/stderr as text streams
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      if (process.platform === "win32") {
+        // On Windows, .cmd shims cannot be spawned with shell:false (EINVAL).
+        // Route through cmd.exe /C with ONLY the fixed trusted flag string.
+        // The prompt is sent via stdin — never via the command line.
+        const comspec = process.env.ComSpec ?? "cmd.exe";
+        // Build the shell command from fixed constant parts only.
+        // bobBin is the resolved .cmd path (trusted, not user input).
+        // Quote every argument so paths containing spaces (e.g. the worktree
+        // path passed to --workspace) are not split by cmd.exe.
+        const shellCmd = [`"${bobBin}"`, ...bobFixedArgs.map((a) => `"${a}"`)].join(" ");
+        proc = spawn(
+          /*turbopackIgnore: true*/ comspec,
+          ["/C", shellCmd],
+          {
+            env: process.env,
+            shell: false,
+            stdio: ["pipe", "pipe", "pipe"],
+          }
+        );
+      } else {
+        proc = spawn(bobBin, bobFixedArgs, {
+          env: process.env,
+          shell: false,
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+      }
     } catch (spawnErr) {
       // spawn itself failed (e.g., binary not found)
       rawLogs.push(`[spawn error] ${String(spawnErr)}`);
       resolve({ exitCode: -1, events, rawLogs });
       return;
+    }
+
+    // Write the prompt to stdin, then close it so Bob knows input is done.
+    // This is the ONLY place user-provided text enters the child process —
+    // through the stdin pipe, never through the shell command line.
+    try {
+      proc.stdin?.write(prompt, "utf8");
+      proc.stdin?.end();
+    } catch (stdinErr) {
+      rawLogs.push(`[stdin error] ${String(stdinErr)}`);
     }
 
     // ── stdout: incremental newline-delimited JSON parsing ──────────────────
