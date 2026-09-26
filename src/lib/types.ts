@@ -72,6 +72,8 @@ export interface BattleState {
   contenders: ContenderState[];
   /** Evidence-backed distinctions; no aggregate winner */
   distinctions: Distinction[];
+  /** Survivor selected by the developer for a future merge. */
+  selectedContenderId?: ContenderRole;
   /** Error message to show in the UI */
   error?: string;
 }

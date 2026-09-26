@@ -138,6 +138,8 @@ export interface Battle {
   baseCommit: string;
   status: BattleStatus;
   contenders: ContenderBattleState[];
+  /** Survivor the developer selected for a future merge. */
+  selectedContenderId?: ContenderId;
   /** ISO timestamp when the battle was created */
   createdAt: string;
   /** ISO timestamp when the last run started */

@@ -477,14 +477,20 @@ function DiffModal({
 function SurvivorActions({
   survivors,
   battleId,
+  selectedContenderId,
+  onSelect,
 }: {
   survivors: ContenderState[];
   battleId: string | null;
+  selectedContenderId?: ContenderRole;
+  onSelect: (contenderId: ContenderRole) => void;
 }) {
   const [loadingId, setLoadingId] = useState<ContenderRole | null>(null);
+  const [selectingId, setSelectingId] = useState<ContenderRole | null>(null);
   const [diffData, setDiffData] = useState<DiffResponse | null>(null);
   const [diffContender, setDiffContender] = useState<ContenderState | null>(null);
   const [diffError, setDiffError] = useState<string | null>(null);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
 
   async function inspectDiff(contender: ContenderState) {
     if (!battleId) return;
@@ -502,12 +508,12 @@ function SurvivorActions({
         }
       );
 
-      const body = await response.json();
-
       if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
         throw new Error(body.error ?? "Failed to load diff");
       }
 
+      const body = await response.json();
       setDiffData(body as DiffResponse);
       setDiffContender(contender);
     } catch (error) {
@@ -521,7 +527,81 @@ function SurvivorActions({
     }
   }
 
-  if (survivors.length === 0) return null;
+  async function selectContender(contender: ContenderState) {
+    if (!battleId) return;
+
+    setSelectingId(contender.id);
+    setSelectionError(null);
+
+    try {
+      const response = await fetch(
+        `/api/battles/${encodeURIComponent(battleId)}/select`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contenderId: contender.id }),
+        }
+      );
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed to select candidate");
+      }
+
+      const body = await response.json();
+      const echoed = body.selectedContenderId as ContenderRole | undefined;
+      onSelect(echoed === contender.id ? echoed : contender.id);
+    } catch (error) {
+      setSelectionError(
+        error instanceof Error ? error.message : "Failed to select candidate"
+      );
+    } finally {
+      setSelectingId(null);
+    }
+  }
+
+  const selectedContender = survivors.find((c) => c.id === selectedContenderId);
+
+  if (survivors.length === 0) {
+    return (
+      <div
+        style={{
+          background: "var(--bg-card)",
+          border: "1px solid var(--border-default)",
+          borderRadius: "var(--radius-lg)",
+          padding: "16px 20px",
+          marginTop: 16,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: "var(--text-muted)",
+            fontFamily: "var(--font-geist-mono, monospace)",
+            marginBottom: 4,
+          }}
+        >
+          Developer Actions
+        </div>
+        <div
+          style={{
+            padding: "10px 14px",
+            borderRadius: "var(--radius-sm)",
+            background: "rgba(239,68,68,0.06)",
+            border: "1px solid rgba(239,68,68,0.2)",
+            fontSize: 12,
+            color: "var(--s-failed)",
+            fontFamily: "var(--font-geist-mono, monospace)",
+          }}
+        >
+          No contenders survived the Gauntlet — none can be selected.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -563,6 +643,22 @@ function SurvivorActions({
           Failed to load diff: {diffError}
         </div>
       )}
+      {selectionError && (
+        <div
+          role="alert"
+          style={{
+            padding: "10px 12px",
+            border: "1px solid rgba(239,68,68,0.3)",
+            borderRadius: "var(--radius-sm)",
+            background: "rgba(239,68,68,0.08)",
+            color: "var(--s-failed)",
+            fontSize: 11,
+            fontFamily: "var(--font-geist-mono, monospace)",
+          }}
+        >
+          Failed to select candidate: {selectionError}
+        </div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {survivors.map((c) => {
           const color = ROLE_COLOR[c.id];
@@ -596,6 +692,19 @@ function SurvivorActions({
                 >
                   {c.label}
                 </span>
+                {selectedContenderId === c.id && (
+                  <span
+                    style={{
+                      color,
+                      fontFamily: "var(--font-geist-mono, monospace)",
+                      fontSize: 9,
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    SELECTED FOR MERGE
+                  </span>
+                )}
               </div>
 
               {/* Actions */}
@@ -633,7 +742,9 @@ function SurvivorActions({
 
                 {/* Choose Candidate */}
                 <button
-                  disabled
+                  type="button"
+                  disabled={!battleId || selectingId !== null}
+                  onClick={() => void selectContender(c)}
                   style={{
                     height: 32,
                     padding: "0 14px",
@@ -645,7 +756,7 @@ function SurvivorActions({
                     fontSize: 11,
                     fontWeight: 700,
                     letterSpacing: "0.04em",
-                    cursor: "not-allowed",
+                    cursor: !battleId || selectingId !== null ? "not-allowed" : "pointer",
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
@@ -654,13 +765,52 @@ function SurvivorActions({
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                     <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  Choose Candidate
+                  {selectingId === c.id
+                    ? "Selecting..."
+                    : selectedContenderId === c.id
+                    ? "✓ Selected"
+                    : "Choose Candidate"}
                 </button>
               </div>
             </div>
           );
         })}
       </div>
+      {selectedContender && (
+        <div
+          style={{
+            paddingTop: 12,
+            borderTop: "1px solid var(--border-subtle)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+          }}
+        >
+          <span
+            style={{
+              color: ROLE_COLOR[selectedContender.id],
+              fontFamily: "var(--font-geist-mono, monospace)",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+            }}
+          >
+            SELECTED FOR MERGE
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)" }}>
+            {selectedContender.label}
+          </span>
+          <span
+            style={{
+              color: "var(--text-secondary)",
+              fontFamily: "var(--font-geist-mono, monospace)",
+              fontSize: 11,
+            }}
+          >
+            All Gauntlet checks passed · {selectedContender.linesChanged} lines changed
+          </span>
+        </div>
+      )}
       {diffData && diffContender && (
         <DiffModal
           contender={diffContender}
@@ -680,12 +830,16 @@ interface ResultsPanelProps {
   contenders: ContenderState[];
   distinctions: Distinction[];
   battleId: string | null;
+  selectedContenderId?: ContenderRole;
+  onSelect: (contenderId: ContenderRole) => void;
 }
 
 export default function ResultsPanel({
   contenders,
   distinctions,
   battleId,
+  selectedContenderId,
+  onSelect,
 }: ResultsPanelProps) {
   const survivors = contenders.filter((c) => c.status === "survived");
 
@@ -784,7 +938,12 @@ export default function ResultsPanel({
         <ComparisonTable contenders={contenders} />
 
         {/* ── Developer actions ── */}
-        <SurvivorActions survivors={survivors} battleId={battleId} />
+        <SurvivorActions
+          survivors={survivors}
+          battleId={battleId}
+          selectedContenderId={selectedContenderId}
+          onSelect={onSelect}
+        />
       </div>
     </section>
   );

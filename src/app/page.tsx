@@ -232,6 +232,7 @@ function mapBattle(battle: Battle, featureRequest: string): BattleState {
     featureRequest,
     contenders,
     distinctions,
+    selectedContenderId: battle.selectedContenderId,
   };
 }
 
@@ -373,6 +374,10 @@ export default function Home() {
   );
 
   // ── Start battle ─────────────────────────────────────────────────────────────
+  function handleSelection(selectedContenderId: ContenderRole) {
+    setBattle((prev) => ({ ...prev, selectedContenderId }));
+  }
+
   async function handleStart() {
     if (activeBattleId || battle.phase === "running") return;
     if (!featureRequest.trim()) return;
@@ -497,6 +502,8 @@ export default function Home() {
             contenders={battle.contenders}
             distinctions={battle.distinctions}
             battleId={completedBattleId}
+            selectedContenderId={battle.selectedContenderId}
+            onSelect={handleSelection}
           />
         )}
 
