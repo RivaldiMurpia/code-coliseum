@@ -14,23 +14,27 @@ const ROLE_ICON: Record<ContenderRole, string> = {
 };
 
 const STATUS_LABEL: Record<ContenderState["status"], string> = {
-  idle:       "Idle",
-  thinking:   "Thinking",
-  coding:     "Coding",
-  testing:    "Testing",
-  survived:   "Survived",
-  eliminated: "Eliminated",
-  failed:     "Failed",
+  idle:              "Idle",
+  waiting:           "Waiting",
+  preparing:         "Preparing workspace",
+  ready:             "Ready",
+  implementing:      "Implementing",
+  "entering-gauntlet": "Entering Gauntlet",
+  survived:          "Survived",
+  eliminated:        "Eliminated",
+  failed:            "Failed",
 };
 
 const STATUS_COLOR: Record<ContenderState["status"], string> = {
-  idle:       "var(--s-idle)",
-  thinking:   "var(--s-running)",
-  coding:     "var(--s-running)",
-  testing:    "var(--s-running)",
-  survived:   "var(--s-done)",
-  eliminated: "var(--s-failed)",
-  failed:     "var(--s-failed)",
+  idle:              "var(--s-idle)",
+  waiting:           "var(--s-idle)",
+  preparing:         "var(--s-running)",
+  ready:             "var(--s-running)",
+  implementing:      "var(--s-running)",
+  "entering-gauntlet": "var(--s-running)",
+  survived:          "var(--s-done)",
+  eliminated:        "var(--s-failed)",
+  failed:            "var(--s-failed)",
 };
 
 /* ─── Tiny helpers ──────────────────────────────────────────────────────── */
@@ -70,62 +74,6 @@ function Metric({
   );
 }
 
-function TestBar({ passed, total }: { passed: number; total: number }) {
-  const allPass = passed === total;
-  const pct = total > 0 ? Math.round((passed / total) * 100) : 0;
-  return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 5,
-        }}
-      >
-        <span
-          style={{
-            fontSize: 10,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: "var(--text-muted)",
-          }}
-        >
-          Acceptance Tests
-        </span>
-        <span
-          style={{
-            fontSize: 11,
-            fontFamily: "var(--font-geist-mono, monospace)",
-            color: allPass ? "var(--s-done)" : "var(--s-failed)",
-            fontWeight: 600,
-          }}
-        >
-          {passed}/{total}
-        </span>
-      </div>
-      <div
-        style={{
-          height: 3,
-          borderRadius: 2,
-          background: "var(--border-subtle)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            height: "100%",
-            width: `${pct}%`,
-            borderRadius: 2,
-            background: allPass ? "var(--s-done)" : "var(--s-failed)",
-            transition: "width 0.4s ease",
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
 /* ─── ContenderCard ─────────────────────────────────────────────────────── */
 interface ContenderCardProps {
   contender: ContenderState;
@@ -136,9 +84,22 @@ export default function ContenderCard({ contender }: ContenderCardProps) {
   const icon = ROLE_ICON[contender.id];
   const statusLabel = STATUS_LABEL[contender.status];
   const statusColor = STATUS_COLOR[contender.status];
-  const isEliminated = contender.status === "eliminated" || contender.status === "failed";
+  const isEliminated =
+    contender.status === "eliminated" || contender.status === "failed";
   const isSurvived = contender.status === "survived";
-  const agentSec = (contender.agentTimeMs / 1000).toFixed(1);
+  const isRunning =
+    contender.status === "implementing" ||
+    contender.status === "entering-gauntlet";
+
+  const agentSec =
+    contender.agentTimeMs > 0
+      ? `${(contender.agentTimeMs / 1000).toFixed(1)}s`
+      : "—";
+
+  const filesDisplay =
+    contender.filesChanged > 0 ? String(contender.filesChanged) : "—";
+  const linesDisplay =
+    contender.linesChanged > 0 ? String(contender.linesChanged) : "—";
 
   return (
     <article
@@ -216,7 +177,9 @@ export default function ContenderCard({ contender }: ContenderCardProps) {
               style={{
                 fontSize: 15,
                 fontWeight: 700,
-                color: isEliminated ? "var(--text-secondary)" : "var(--text-primary)",
+                color: isEliminated
+                  ? "var(--text-secondary)"
+                  : "var(--text-primary)",
                 margin: 0,
                 letterSpacing: "-0.01em",
               }}
@@ -296,8 +259,8 @@ export default function ContenderCard({ contender }: ContenderCardProps) {
         </div>
       )}
 
-      {/* ── Final action (when survived or eliminated, non-running) ── */}
-      {(isSurvived || isEliminated) && (
+      {/* ── Current action / outcome ── */}
+      {contender.currentAction && (
         <div
           style={{
             padding: "8px 10px",
@@ -316,12 +279,16 @@ export default function ContenderCard({ contender }: ContenderCardProps) {
               marginBottom: 3,
             }}
           >
-            Outcome
+            {isRunning ? "Current Action" : "Outcome"}
           </span>
           <span
             style={{
               fontSize: 12,
-              color: isSurvived ? "var(--text-secondary)" : "var(--s-failed)",
+              color: isSurvived
+                ? "var(--text-secondary)"
+                : isEliminated
+                ? "var(--s-failed)"
+                : "var(--text-secondary)",
               fontFamily: "var(--font-geist-mono, monospace)",
               display: "block",
               overflow: "hidden",
@@ -329,13 +296,38 @@ export default function ContenderCard({ contender }: ContenderCardProps) {
               whiteSpace: "nowrap",
             }}
           >
-            {contender.finalAction || "—"}
+            {contender.currentAction}
           </span>
         </div>
       )}
 
-      {/* ── Acceptance test bar ── */}
-      <TestBar passed={contender.testsPassed} total={contender.testsTotal} />
+      {/* ── Acceptance indicator ── */}
+      {contender.acceptancePassed !== null && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontFamily: "var(--font-geist-mono, monospace)",
+              color: contender.acceptancePassed
+                ? "var(--s-done)"
+                : "var(--s-failed)",
+              fontWeight: 700,
+            }}
+          >
+            {contender.acceptancePassed ? "✓" : "✕"}
+          </span>
+          <span
+            style={{
+              fontSize: 11,
+              color: contender.acceptancePassed
+                ? "var(--s-done)"
+                : "var(--s-failed)",
+            }}
+          >
+            Acceptance Test
+          </span>
+        </div>
+      )}
 
       {/* ── Metrics grid ── */}
       <div
@@ -347,68 +339,10 @@ export default function ContenderCard({ contender }: ContenderCardProps) {
           borderTop: "1px solid var(--border-subtle)",
         }}
       >
-        <Metric label="Files Δ"    value={contender.filesChanged}   dim={isEliminated} />
-        <Metric label="Lines Δ"    value={contender.linesChanged}   dim={isEliminated} />
-        <Metric label="Agent Time" value={`${agentSec}s`}           dim={isEliminated} />
+        <Metric label="Files Δ"    value={filesDisplay}  dim={isEliminated} />
+        <Metric label="Lines Δ"    value={linesDisplay}  dim={isEliminated} />
+        <Metric label="Agent Time" value={agentSec}      dim={isEliminated} />
       </div>
-
-      {/* ── Benchmarks (survived only) ── */}
-      {!isEliminated && contender.benchmarks.length > 0 && (
-        <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 12 }}>
-          <span
-            style={{
-              fontSize: 10,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: "var(--text-muted)",
-              display: "block",
-              marginBottom: 8,
-            }}
-          >
-            Implementation Benchmarks
-          </span>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 8,
-            }}
-          >
-            {contender.benchmarks.map((b) => (
-              <div
-                key={b.label}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 2,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: "0.06em",
-                    color: "var(--text-muted)",
-                    textTransform: "lowercase",
-                  }}
-                >
-                  {b.label}
-                </span>
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    fontFamily: "var(--font-geist-mono, monospace)",
-                    color: "var(--text-primary)",
-                    lineHeight: 1,
-                  }}
-                >
-                  {b.value}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </article>
   );
 }

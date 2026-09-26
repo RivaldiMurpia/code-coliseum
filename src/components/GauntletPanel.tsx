@@ -1,13 +1,11 @@
 import type { ContenderState, ContenderRole, GauntletCheckId, GauntletResult } from "@/lib/types";
 
-/* ─── Check definitions ─────────────────────────────────────────────────── */
+/* ─── Real check definitions (match gauntlet.ts IDs) ────────────────────── */
 const CHECKS: { id: GauntletCheckId; label: string }[] = [
-  { id: "build",               label: "Build"              },
-  { id: "existing-tests",      label: "Existing Tests"     },
-  { id: "acceptance-tests",    label: "Acceptance Tests"   },
-  { id: "typescript-strict",   label: "TypeScript Strict"  },
-  { id: "no-new-deps",         label: "No New Dependencies"},
-  { id: "api-compatibility",   label: "API Compatibility"  },
+  { id: "dep-integrity", label: "Dependency Integrity" },
+  { id: "type-safety",   label: "Type Safety"          },
+  { id: "build",         label: "Production Build"     },
+  { id: "acceptance",    label: "Acceptance Test"      },
 ];
 
 const ROLE_COLOR: Record<ContenderRole, string> = {

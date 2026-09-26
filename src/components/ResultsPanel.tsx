@@ -2,7 +2,6 @@ import type {
   ContenderState,
   ContenderRole,
   Distinction,
-  BenchmarkResult,
 } from "@/lib/types";
 
 /* ─── Shared colour maps ────────────────────────────────────────────────── */
@@ -28,22 +27,25 @@ interface CompareRow {
 }
 
 function agentTimeSec(c: ContenderState) {
+  if (c.agentTimeMs <= 0) return { display: "—", raw: -1 };
   return { display: `${(c.agentTimeMs / 1000).toFixed(1)}s`, raw: c.agentTimeMs };
 }
 
 const COMPARISON_ROWS: CompareRow[] = [
   {
-    label: "Acceptance Tests",
-    values: (c) => ({ display: `${c.testsPassed}/${c.testsTotal}`, raw: c.testsPassed }),
-  },
-  {
     label: "Files Changed",
-    values: (c) => ({ display: String(c.filesChanged), raw: c.filesChanged }),
+    values: (c) => ({
+      display: c.filesChanged > 0 ? String(c.filesChanged) : "—",
+      raw: c.filesChanged,
+    }),
     lowerIsBetter: true,
   },
   {
     label: "Lines Changed",
-    values: (c) => ({ display: String(c.linesChanged), raw: c.linesChanged }),
+    values: (c) => ({
+      display: c.linesChanged > 0 ? String(c.linesChanged) : "—",
+      raw: c.linesChanged,
+    }),
     lowerIsBetter: true,
   },
   {
@@ -59,11 +61,13 @@ function getBestIndices(
   row: CompareRow
 ): Set<number> {
   const nums = contenders.map((c) => row.values(c).raw);
-  const candidates = row.survivorsOnly
-    ? nums.map((n, i) =>
-        contenders[i].status === "survived" ? n : null
-      )
-    : nums;
+  // Only include contenders with real values (> 0 for sizes, > -1 for time)
+  const candidates = nums.map((n, i) => {
+    const hasValue = n > 0;
+    if (!hasValue) return null;
+    if (row.survivorsOnly && contenders[i].status !== "survived") return null;
+    return n;
+  });
 
   const filtered = candidates.filter((n) => n !== null) as number[];
   if (filtered.length === 0) return new Set();
@@ -133,161 +137,6 @@ function DistinctionBadge({ d }: { d: Distinction }) {
       >
         {d.evidence}
       </p>
-    </div>
-  );
-}
-
-/* ─── Benchmark comparison table ────────────────────────────────────────── */
-function BenchmarkTable({
-  survivors,
-}: {
-  survivors: ContenderState[];
-}) {
-  if (survivors.length === 0) return null;
-
-  // Collect all unique benchmark labels from first survivor (all survivors have same set)
-  const labels: string[] = survivors[0].benchmarks.map((b) => b.label);
-
-  // Build lookup: contenderId → label → BenchmarkResult
-  const lookup: Record<string, Record<string, BenchmarkResult>> = {};
-  survivors.forEach((c) => {
-    lookup[c.id] = {};
-    c.benchmarks.forEach((b) => { lookup[c.id][b.label] = b; });
-  });
-
-  function getBestBenchIdx(label: string): Set<number> {
-    const first = survivors[0].benchmarks.find((b) => b.label === label);
-    if (!first) return new Set();
-    const raws = survivors.map((c) => lookup[c.id][label]?.raw ?? 0);
-    const target = first.lowerIsBetter ? Math.min(...raws) : Math.max(...raws);
-    const best = new Set<number>();
-    raws.forEach((r, i) => { if (r === target) best.add(i); });
-    return best;
-  }
-
-  return (
-    <div
-      style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border-default)",
-        borderRadius: "var(--radius-lg)",
-        overflow: "hidden",
-        marginBottom: 16,
-      }}
-    >
-      {/* Header row */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `160px repeat(${survivors.length}, 1fr)`,
-          background: "var(--bg-raised)",
-          borderBottom: "1px solid var(--border-default)",
-        }}
-      >
-        <div
-          style={{
-            padding: "10px 16px",
-            fontSize: 10,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: "var(--text-muted)",
-            fontFamily: "var(--font-geist-mono, monospace)",
-          }}
-        >
-          Benchmark
-        </div>
-        {survivors.map((c) => (
-          <div
-            key={c.id}
-            style={{
-              padding: "10px 16px",
-              borderLeft: "1px solid var(--border-subtle)",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <span style={{ fontSize: 12, color: ROLE_COLOR[c.id] }}>
-              {ROLE_ICON[c.id]}
-            </span>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: ROLE_COLOR[c.id],
-                letterSpacing: "0.02em",
-              }}
-            >
-              {c.label}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* Benchmark rows */}
-      {labels.map((label, li) => {
-        const bestSet = getBestBenchIdx(label);
-        return (
-          <div
-            key={label}
-            style={{
-              display: "grid",
-              gridTemplateColumns: `160px repeat(${survivors.length}, 1fr)`,
-              borderBottom:
-                li < labels.length - 1 ? "1px solid var(--border-subtle)" : "none",
-            }}
-          >
-            <div
-              style={{
-                padding: "11px 16px",
-                fontSize: 12,
-                color: "var(--text-secondary)",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              {label}
-            </div>
-            {survivors.map((c, ci) => {
-              const b = lookup[c.id][label];
-              const isBest = bestSet.has(ci);
-              const color = ROLE_COLOR[c.id];
-              return (
-                <div
-                  key={c.id}
-                  style={{
-                    padding: "11px 16px",
-                    borderLeft: "1px solid var(--border-subtle)",
-                    fontFamily: "var(--font-geist-mono, monospace)",
-                    fontSize: 13,
-                    fontWeight: isBest ? 700 : 400,
-                    color: isBest ? color : "var(--text-secondary)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    background: isBest ? `${color}08` : "transparent",
-                  }}
-                >
-                  {b?.value ?? "—"}
-                  {isBest && (
-                    <span
-                      style={{
-                        fontSize: 8,
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
-                        color,
-                        opacity: 0.8,
-                      }}
-                    >
-                      ▲
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -630,43 +479,23 @@ export default function ResultsPanel({
           </div>
         )}
 
-        {/* ── Sub-label: Implementation Benchmarks ── */}
-        {survivors.length >= 2 && (
-          <>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 12,
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "var(--font-geist-mono, monospace)",
-                  fontSize: 10,
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  color: "var(--text-muted)",
-                }}
-              >
-                Implementation Benchmarks
-              </span>
-              <div
-                style={{ flex: 1, height: 1, background: "var(--border-subtle)" }}
-              />
-              <span
-                style={{
-                  fontSize: 10,
-                  color: "var(--text-muted)",
-                  fontFamily: "var(--font-geist-mono, monospace)",
-                }}
-              >
-                Survivors only
-              </span>
-            </div>
-            <BenchmarkTable survivors={survivors} />
-          </>
+        {/* ── Survivors note ── */}
+        {survivors.length > 1 && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "10px 14px",
+              borderRadius: "var(--radius-sm)",
+              background: "rgba(34,197,94,0.06)",
+              border: "1px solid rgba(34,197,94,0.2)",
+              fontSize: 12,
+              color: "var(--s-done)",
+              fontFamily: "var(--font-geist-mono, monospace)",
+            }}
+          >
+            {survivors.length} contenders survived the Gauntlet — both are valid
+            candidates. Review the diff before choosing one.
+          </div>
         )}
 
         {/* ── Sub-label: Full Comparison ── */}
