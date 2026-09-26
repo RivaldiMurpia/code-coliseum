@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 import type {
   ContenderState,
   ContenderRole,
@@ -298,8 +302,225 @@ function ComparisonTable({ contenders }: { contenders: ContenderState[] }) {
   );
 }
 
+interface DiffResponse {
+  battleId: string;
+  contenderId: string;
+  filesChanged: number;
+  files: string[];
+  patch: string;
+  truncated: boolean;
+}
+
+function DiffModal({
+  contender,
+  diff,
+  onClose,
+}: {
+  contender: ContenderState;
+  diff: DiffResponse;
+  onClose: () => void;
+}) {
+  const color = ROLE_COLOR[contender.id];
+
+  return (
+    <div
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        background: "rgba(0,0,0,0.62)",
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="diff-modal-title"
+        style={{
+          width: "min(1100px, 100%)",
+          maxHeight: "min(760px, calc(100vh - 48px))",
+          display: "flex",
+          flexDirection: "column",
+          background: "var(--bg-card)",
+          border: "1px solid var(--border-default)",
+          borderRadius: "var(--radius-lg)",
+          overflow: "hidden",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+        }}
+      >
+        <div
+          style={{
+            padding: "16px 20px",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 16,
+            borderBottom: "1px solid var(--border-default)",
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div
+              id="diff-modal-title"
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: "var(--text-primary)",
+              }}
+            >
+              {contender.label} Diff
+            </div>
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: 11,
+                color: "var(--text-secondary)",
+                fontFamily: "var(--font-geist-mono, monospace)",
+              }}
+            >
+              <span style={{ color }}>{diff.filesChanged}</span>{" "}
+              file{diff.filesChanged === 1 ? "" : "s"} changed
+              {diff.truncated ? " · output truncated" : ""}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              marginLeft: "auto",
+              height: 30,
+              padding: "0 10px",
+              border: "1px solid var(--border-default)",
+              borderRadius: "var(--radius-sm)",
+              background: "var(--bg-raised)",
+              color: "var(--text-secondary)",
+              fontFamily: "var(--font-geist-mono, monospace)",
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            Close
+          </button>
+        </div>
+
+        <div
+          style={{
+            padding: "12px 20px",
+            borderBottom: "1px solid var(--border-subtle)",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+          }}
+        >
+          {diff.files.length > 0 ? (
+            diff.files.map((file) => (
+              <span
+                key={file}
+                style={{
+                  maxWidth: "100%",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  padding: "3px 6px",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: 3,
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-geist-mono, monospace)",
+                  fontSize: 10,
+                }}
+              >
+                {file}
+              </span>
+            ))
+          ) : (
+            <span
+              style={{
+                color: "var(--text-muted)",
+                fontFamily: "var(--font-geist-mono, monospace)",
+                fontSize: 11,
+              }}
+            >
+              No changed files reported.
+            </span>
+          )}
+        </div>
+
+        <pre
+          style={{
+            margin: 0,
+            padding: 20,
+            minHeight: 0,
+            overflowX: "auto",
+            overflowY: "auto",
+            whiteSpace: "pre",
+            tabSize: 2,
+            background: "var(--bg-base)",
+            color: "var(--text-secondary)",
+            fontFamily: "var(--font-geist-mono, monospace)",
+            fontSize: 12,
+            lineHeight: 1.55,
+          }}
+        >
+          {diff.patch || "No tracked or untracked changes found."}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Survivor actions ──────────────────────────────────────────────────── */
-function SurvivorActions({ survivors }: { survivors: ContenderState[] }) {
+function SurvivorActions({
+  survivors,
+  battleId,
+}: {
+  survivors: ContenderState[];
+  battleId: string | null;
+}) {
+  const [loadingId, setLoadingId] = useState<ContenderRole | null>(null);
+  const [diffData, setDiffData] = useState<DiffResponse | null>(null);
+  const [diffContender, setDiffContender] = useState<ContenderState | null>(null);
+  const [diffError, setDiffError] = useState<string | null>(null);
+
+  async function inspectDiff(contender: ContenderState) {
+    if (!battleId) return;
+
+    setLoadingId(contender.id);
+    setDiffError(null);
+
+    try {
+      const response = await fetch(
+        `/api/battles/${encodeURIComponent(
+          battleId
+        )}/contenders/${encodeURIComponent(contender.id)}/diff`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      const body = await response.json();
+
+      if (!response.ok) {
+        throw new Error(body.error ?? "Failed to load diff");
+      }
+
+      setDiffData(body as DiffResponse);
+      setDiffContender(contender);
+    } catch (error) {
+      setDiffError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load diff"
+      );
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
   if (survivors.length === 0) return null;
   return (
     <div
@@ -326,6 +547,22 @@ function SurvivorActions({ survivors }: { survivors: ContenderState[] }) {
       >
         Developer Actions
       </div>
+      {diffError && (
+        <div
+          role="alert"
+          style={{
+            padding: "10px 12px",
+            border: "1px solid rgba(239,68,68,0.3)",
+            borderRadius: "var(--radius-sm)",
+            background: "rgba(239,68,68,0.08)",
+            color: "var(--s-failed)",
+            fontSize: 11,
+            fontFamily: "var(--font-geist-mono, monospace)",
+          }}
+        >
+          Failed to load diff: {diffError}
+        </div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {survivors.map((c) => {
           const color = ROLE_COLOR[c.id];
@@ -365,7 +602,9 @@ function SurvivorActions({ survivors }: { survivors: ContenderState[] }) {
               <div style={{ display: "flex", gap: 8 }}>
                 {/* Inspect Diff */}
                 <button
-                  disabled
+                  type="button"
+                  disabled={!battleId || loadingId === c.id}
+                  onClick={() => inspectDiff(c)}
                   style={{
                     height: 32,
                     padding: "0 14px",
@@ -377,7 +616,10 @@ function SurvivorActions({ survivors }: { survivors: ContenderState[] }) {
                     fontSize: 11,
                     fontWeight: 600,
                     letterSpacing: "0.04em",
-                    cursor: "not-allowed",
+                    cursor:
+                    !battleId || loadingId === c.id
+                    ? "not-allowed"
+                    : "pointer",
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
@@ -386,7 +628,7 @@ function SurvivorActions({ survivors }: { survivors: ContenderState[] }) {
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                     <path d="M2 3h8M2 6h8M2 9h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                   </svg>
-                  Inspect Diff
+                  {loadingId === c.id ? "Loading..." : "Inspect Diff"}
                 </button>
 
                 {/* Choose Candidate */}
@@ -419,6 +661,16 @@ function SurvivorActions({ survivors }: { survivors: ContenderState[] }) {
           );
         })}
       </div>
+      {diffData && diffContender && (
+        <DiffModal
+          contender={diffContender}
+          diff={diffData}
+          onClose={() => {
+            setDiffData(null);
+            setDiffContender(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -427,11 +679,13 @@ function SurvivorActions({ survivors }: { survivors: ContenderState[] }) {
 interface ResultsPanelProps {
   contenders: ContenderState[];
   distinctions: Distinction[];
+  battleId: string | null;
 }
 
 export default function ResultsPanel({
   contenders,
   distinctions,
+  battleId,
 }: ResultsPanelProps) {
   const survivors = contenders.filter((c) => c.status === "survived");
 
@@ -480,7 +734,7 @@ export default function ResultsPanel({
         )}
 
         {/* ── Survivors note ── */}
-        {survivors.length > 1 && (
+        {survivors.length > 0 && (
           <div
             style={{
               marginBottom: 16,
@@ -530,7 +784,7 @@ export default function ResultsPanel({
         <ComparisonTable contenders={contenders} />
 
         {/* ── Developer actions ── */}
-        <SurvivorActions survivors={survivors} />
+        <SurvivorActions survivors={survivors} battleId={battleId} />
       </div>
     </section>
   );

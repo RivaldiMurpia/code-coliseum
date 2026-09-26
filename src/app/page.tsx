@@ -316,6 +316,7 @@ const IDLE_STATE: BattleState = {
 export default function Home() {
   const [battle, setBattle] = useState<BattleState>(IDLE_STATE);
   const [activeBattleId, setActiveBattleId] = useState<string | null>(null);
+  const [completedBattleId, setCompletedBattleId] = useState<string | null>(null);
   const [featureRequest, setFeatureRequest] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -351,6 +352,7 @@ export default function Home() {
 
           if (isBattleSettled(data)) {
             stopPolling();
+            setCompletedBattleId(battleId);
             setActiveBattleId(null);
           }
 
@@ -376,6 +378,7 @@ export default function Home() {
     if (!featureRequest.trim()) return;
 
     // Clear any previous error, show loading state
+    setCompletedBattleId(null);
     setBattle(makeInitialRunningState(featureRequest));
 
     try {
@@ -493,6 +496,7 @@ export default function Home() {
           <ResultsPanel
             contenders={battle.contenders}
             distinctions={battle.distinctions}
+            battleId={completedBattleId}
           />
         )}
 
