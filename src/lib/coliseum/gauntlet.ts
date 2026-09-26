@@ -88,7 +88,8 @@ function spawnCapture(
   cmd: string,
   args: string[],
   cwd: string,
-  timeoutMs: number
+  timeoutMs: number,
+  env: NodeJS.ProcessEnv = process.env
 ): Promise<SpawnResult> {
   return new Promise<SpawnResult>((resolve) => {
     let child: ReturnType<typeof spawn>;
@@ -98,11 +99,11 @@ function spawnCapture(
       child = spawn(
         /*turbopackIgnore: true*/ comspec,
         ["/D", "/S", "/C", cmd, ...args],
-        { cwd, env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"] }
+        { cwd, env, shell: false, stdio: ["ignore", "pipe", "pipe"] }
       );
     } else {
       child = spawn(cmd, args, {
-        cwd, env: process.env, shell: false, stdio: ["ignore", "pipe", "pipe"],
+        cwd, env, shell: false, stdio: ["ignore", "pipe", "pipe"],
       });
     }
 
@@ -250,7 +251,8 @@ async function checkProductionBuild(
   const result = await spawnCapture(
     "npm", ["run", "build"],
     worktreePath,
-    5 * 60_000
+    5 * 60_000,
+    { ...process.env, NODE_ENV: "production" as const }
   );
 
   if (result.exitCode !== 0) {
@@ -385,19 +387,20 @@ function spawnNextServer(
   port: number
 ): ReturnType<typeof spawn> {
   const portStr = String(port);
+  const env = { ...process.env, NODE_ENV: "production" as const };
 
   if (process.platform === "win32") {
     const comspec = process.env.ComSpec ?? "cmd.exe";
     return spawn(
       /*turbopackIgnore: true*/ comspec,
       ["/D", "/S", "/C", "npm", "run", "start", "--", "--port", portStr],
-      { cwd: worktreePath, env: process.env, shell: false, stdio: "ignore" }
+      { cwd: worktreePath, env, shell: false, stdio: "ignore" }
     );
   }
 
   return spawn(
     "npm", ["run", "start", "--", "--port", portStr],
-    { cwd: worktreePath, env: process.env, shell: false, stdio: "ignore" }
+    { cwd: worktreePath, env, shell: false, stdio: "ignore" }
   );
 }
 

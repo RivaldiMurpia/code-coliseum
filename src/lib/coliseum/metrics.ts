@@ -9,10 +9,10 @@
  *
  * Solution:
  *   1. Use `git diff --numstat HEAD` for tracked changes.
- *   2. Use `git status --porcelain` to find untracked files (lines starting
- *      with "?? "), then count their lines via `git diff --numstat /dev/null`
- *      (or wc-style) to include them in the total.
+ *   2. Use `git ls-files --others --exclude-standard` to find untracked files,
+ *      then read each file directly to count its lines.
  *   3. Exclude node_modules, .next, and generated cache/build artifacts.
+ *   4. Never double-count a path already counted by tracked diff metrics.
  *
  * No commits are created. Only read operations against the worktree.
  */
@@ -94,6 +94,7 @@ export async function collectMetrics(
 
   try {
     // ── 1. Tracked changes via git diff --numstat HEAD ──────────────────────
+    const trackedPaths = new Set<string>();
     const numstat = await git(worktreePath, ["diff", "--numstat", "HEAD"]);
     for (const line of numstat.split("\n")) {
       const trimmed = line.trim();
@@ -108,17 +109,22 @@ export async function collectMetrics(
       linesAdded += parseInt(added, 10) || 0;
       linesDeleted += parseInt(deleted, 10) || 0;
       filesChanged += 1;
+      trackedPaths.add(filePath.replace(/\\/g, "/"));
     }
 
-    // ── 2. Untracked files via git status --porcelain ──────────────────────
-    const status = await git(worktreePath, ["status", "--porcelain"]);
-    for (const line of status.split("\n")) {
-      if (!line.startsWith("?? ")) continue;
-      const filePath = line.slice(3).trim();
+    // ── 2. Untracked files via git ls-files --others --exclude-standard ─────
+    const lsFiles = await git(worktreePath, [
+      "ls-files", "--others", "--exclude-standard",
+    ]);
+    for (const rawLine of lsFiles.split("\n")) {
+      const filePath = rawLine.trim();
+      if (!filePath) continue;
       if (isExcluded(filePath)) continue;
+      // Avoid double-counting a path already counted by tracked diff
+      const normalised = filePath.replace(/\\/g, "/");
+      if (trackedPaths.has(normalised)) continue;
 
-      // Count lines in the untracked file by reading it directly.
-      // This avoids needing /dev/null (unavailable on Windows) and is simpler.
+      // Count lines by reading the file directly (no /dev/null needed on Windows)
       try {
         const absPath = path.join(worktreePath, filePath);
         const content = readFileSync(/*turbopackIgnore: true*/ absPath, "utf8");
@@ -126,7 +132,7 @@ export async function collectMetrics(
         linesAdded += lineCount;
         filesChanged += 1;
       } catch {
-        // File may have been deleted between status and read — skip it
+        // File may have been deleted between ls-files and read — skip it
       }
     }
   } catch {
