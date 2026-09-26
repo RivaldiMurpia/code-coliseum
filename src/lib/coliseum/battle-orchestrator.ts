@@ -35,7 +35,7 @@ import type { Battle, ContenderBattleState } from "./types";
 function getRepoRoot(): string {
   const cwd = process.cwd();
   // Sanity check: next.config.ts lives at the repo root
-  if (existsSync(path.join(cwd, "next.config.ts")) || existsSync(path.join(cwd, "next.config.js"))) {
+  if (existsSync(path.join(/*turbopackIgnore: true*/ cwd, "next.config.ts")) || existsSync(path.join(/*turbopackIgnore: true*/ cwd, "next.config.js"))) {
     return cwd;
   }
   // Fallback: derive from this file's URL (ESM)
@@ -145,7 +145,9 @@ export async function createBattle(featureRequest: string): Promise<Battle> {
         name: def.name,
         branch,
         worktreePath: wPath,
-        status: "READY",
+        status: "CREATED",
+        events: [],
+        rawLogs: [],
       });
     }
   } catch (err) {
@@ -158,7 +160,8 @@ export async function createBattle(featureRequest: string): Promise<Battle> {
     battleId,
     featureRequest,
     baseCommit,
-    status: "READY",
+    status: "CREATED",
+    createdAt: new Date().toISOString(),
     contenders: createdContenders,
   };
 }

@@ -25,7 +25,7 @@ const WINDOWS_GIT_CANDIDATES = [
 function resolveGitBinary(): string {
   if (process.platform === "win32") {
     for (const candidate of WINDOWS_GIT_CANDIDATES) {
-      if (existsSync(candidate)) return candidate;
+      if (existsSync(/*turbopackIgnore: true*/ candidate)) return candidate;
     }
   }
   // On non-Windows, or if not found above, fall back to PATH lookup.

@@ -9,6 +9,7 @@ import {
   deleteBattle,
   WorkingTreeDirtyError,
 } from "@/lib/coliseum/battle-orchestrator";
+import { putBattle, getBattle, removeBattle, listBattles } from "@/lib/coliseum/battle-store";
 import type { CreateBattleRequest, ApiError } from "@/lib/coliseum/types";
 
 // ─── POST ──────────────────────────────────────────────────────────────────
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const battle = await createBattle(featureRequest);
+    putBattle(battle);
     return Response.json(battle, { status: 201 });
   } catch (err) {
     if (err instanceof WorkingTreeDirtyError) {
@@ -63,6 +65,26 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// ─── GET ───────────────────────────────────────────────────────────────────
+
+export async function GET(request: NextRequest) {
+  const battleId = request.nextUrl.searchParams.get("battleId");
+
+  if (battleId) {
+    const battle = getBattle(battleId);
+    if (!battle) {
+      return Response.json(
+        { error: "Battle not found" } satisfies ApiError,
+        { status: 404 }
+      );
+    }
+    return Response.json(battle);
+  }
+
+  // No battleId — return all battles (list)
+  return Response.json(listBattles());
 }
 
 // ─── DELETE ────────────────────────────────────────────────────────────────
@@ -87,6 +109,7 @@ export async function DELETE(request: NextRequest) {
 
   try {
     await deleteBattle(battleId);
+    removeBattle(battleId);
     return Response.json({ deleted: true, battleId });
   } catch (err) {
     console.error("[DELETE /api/battles] Error during cleanup:", err);
