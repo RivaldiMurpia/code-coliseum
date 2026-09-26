@@ -487,10 +487,13 @@ function SurvivorActions({
 }) {
   const [loadingId, setLoadingId] = useState<ContenderRole | null>(null);
   const [selectingId, setSelectingId] = useState<ContenderRole | null>(null);
+  const [applyingId, setApplyingId] = useState<ContenderRole | null>(null);
   const [diffData, setDiffData] = useState<DiffResponse | null>(null);
   const [diffContender, setDiffContender] = useState<ContenderState | null>(null);
   const [diffError, setDiffError] = useState<string | null>(null);
   const [selectionError, setSelectionError] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [applySuccess, setApplySuccess] = useState<{ filesChanged: number; files: string[] } | null>(null);
 
   async function inspectDiff(contender: ContenderState) {
     if (!battleId) return;
@@ -557,6 +560,41 @@ function SurvivorActions({
       );
     } finally {
       setSelectingId(null);
+    }
+  }
+
+  async function applyContender(contender: ContenderState) {
+    if (!battleId) return;
+
+    setApplyingId(contender.id);
+    setApplyError(null);
+    setApplySuccess(null);
+
+    try {
+      const response = await fetch(
+        `/api/battles/${encodeURIComponent(battleId)}/apply`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed to apply candidate");
+      }
+
+      const body = await response.json();
+      setApplySuccess({
+        filesChanged: body.filesChanged,
+        files: body.files,
+      });
+    } catch (error) {
+      setApplyError(
+        error instanceof Error ? error.message : "Failed to apply candidate"
+      );
+    } finally {
+      setApplyingId(null);
     }
   }
 
@@ -657,6 +695,47 @@ function SurvivorActions({
           }}
         >
           Failed to select candidate: {selectionError}
+        </div>
+      )}
+      {applyError && (
+        <div
+          role="alert"
+          style={{
+            padding: "10px 12px",
+            border: "1px solid rgba(239,68,68,0.3)",
+            borderRadius: "var(--radius-sm)",
+            background: "rgba(239,68,68,0.08)",
+            color: "var(--s-failed)",
+            fontSize: 11,
+            fontFamily: "var(--font-geist-mono, monospace)",
+          }}
+        >
+          Failed to apply candidate: {applyError}
+        </div>
+      )}
+      {applySuccess && (
+        <div
+          role="status"
+          style={{
+            padding: "12px 16px",
+            border: "1px solid rgba(34,197,94,0.3)",
+            borderRadius: "var(--radius-sm)",
+            background: "rgba(34,197,94,0.08)",
+            color: "var(--s-done)",
+            fontSize: 12,
+            fontFamily: "var(--font-geist-mono, monospace)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 13 }}>✓</span>
+            <span style={{ fontWeight: 700 }}>APPLIED TO WORKING TREE</span>
+          </div>
+          <div style={{ marginTop: 8, color: "var(--text-secondary)" }}>
+            {applySuccess.filesChanged} file{applySuccess.filesChanged === 1 ? "" : "s"} applied
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-muted)" }}>
+            Review the changes locally and commit when ready.
+          </div>
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -771,6 +850,36 @@ function SurvivorActions({
                     ? "✓ Selected"
                     : "Choose Candidate"}
                 </button>
+
+                {/* Apply Candidate */}
+                {selectedContenderId === c.id && (
+                  <button
+                    type="button"
+                    disabled={!battleId || applyingId !== null}
+                    onClick={() => void applyContender(c)}
+                    style={{
+                      height: 32,
+                      padding: "0 14px",
+                      borderRadius: "var(--radius-sm)",
+                      border: `1px solid ${color}`,
+                      background: color,
+                      color: "#fff",
+                      fontFamily: "var(--font-geist-mono, monospace)",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: "0.04em",
+                      cursor: !battleId || applyingId !== null ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                      <path d="M10 2L2 10M2 2l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {applyingId === c.id ? "Applying..." : "Apply Candidate"}
+                  </button>
+                )}
               </div>
             </div>
           );
