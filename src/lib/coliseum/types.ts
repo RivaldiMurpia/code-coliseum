@@ -49,6 +49,31 @@ export interface BobEvent {
   rawLine?: string;
 }
 
+// ─── Gauntlet ─────────────────────────────────────────────────────────────
+
+export type GauntletCheckStatus = "PASS" | "FAIL";
+export type GauntletStatus = "SURVIVED" | "ELIMINATED";
+
+export interface GauntletCheck {
+  id: string;
+  name: string;
+  status: GauntletCheckStatus;
+  durationMs?: number;
+  detail?: string;
+}
+
+export interface GauntletMetrics {
+  filesChanged: number;
+  linesAdded: number;
+  linesDeleted: number;
+}
+
+export interface GauntletResult {
+  status: GauntletStatus;
+  checks: GauntletCheck[];
+  metrics: GauntletMetrics;
+}
+
 // ─── Git evidence ──────────────────────────────────────────────────────────
 
 export interface GitEvidence {
@@ -92,6 +117,9 @@ export interface ContenderBattleState {
 
   // Git evidence collected after Bob completes
   gitEvidence?: GitEvidence;
+
+  // Gauntlet result collected after Bob completes (COMPLETED contenders only)
+  gauntlet?: GauntletResult;
 }
 
 // ─── Battle ────────────────────────────────────────────────────────────────

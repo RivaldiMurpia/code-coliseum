@@ -18,6 +18,7 @@ import { type NextRequest } from "next/server";
 import { getBattle, putBattle } from "@/lib/coliseum/battle-store";
 import { provisionBattle } from "@/lib/coliseum/provisioner";
 import { runBattle } from "@/lib/coliseum/bob-runner";
+import { runBattleGauntlet } from "@/lib/coliseum/gauntlet";
 import type { ApiError } from "@/lib/coliseum/types";
 
 export async function POST(
@@ -82,6 +83,25 @@ export async function POST(
 
       // Parallel Bob execution
       await runBattle(battle);
+
+      // ── Gauntlet: deterministic checks on each COMPLETED contender ────────
+      // Run sequentially per contender, in parallel across contenders.
+      // A Gauntlet failure never changes the battle-level status.
+      try {
+        const gauntletResults = await runBattleGauntlet(battle.contenders);
+        for (const contender of battle.contenders) {
+          const result = gauntletResults.get(contender.id);
+          if (result) {
+            contender.gauntlet = result;
+          }
+        }
+      } catch (gauntletErr) {
+        // Non-fatal: Gauntlet failure must not invalidate the battle result
+        console.error(
+          `[run] Battle ${battleId} Gauntlet unexpected error:`,
+          gauntletErr
+        );
+      }
     } catch (err) {
       battle.status = "FAILED";
       console.error(`[run] Battle ${battleId} unexpected error:`, err);
