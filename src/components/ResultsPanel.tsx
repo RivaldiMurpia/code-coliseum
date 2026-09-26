@@ -493,8 +493,12 @@ export default function ResultsPanel({
               fontFamily: "var(--font-geist-mono, monospace)",
             }}
           >
-            {survivors.length} contenders survived the Gauntlet — both are valid
-            candidates. Review the diff before choosing one.
+            {survivors.length === 1
+              ? "1 contender survived the Gauntlet — it is a valid candidate."
+              : survivors.length === 2
+              ? "2 contenders survived the Gauntlet — both are valid candidates."
+              : `${survivors.length} contenders survived the Gauntlet — all are valid candidates.`}{" "}
+            Review the diff before choosing one.
           </div>
         )}
 

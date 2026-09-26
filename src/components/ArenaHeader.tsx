@@ -1,4 +1,37 @@
-export default function ArenaHeader() {
+export type BadgePhase =
+  | "ready"
+  | "preparing"
+  | "running"
+  | "judging"
+  | "complete"
+  | "failed";
+
+const BADGE_LABEL: Record<BadgePhase, string> = {
+  ready:    "Ready",
+  preparing: "Preparing Arena",
+  running:  "Battle Running",
+  judging:  "Judging",
+  complete: "Battle Complete",
+  failed:   "Battle Failed",
+};
+
+const BADGE_COLOR: Record<BadgePhase, string> = {
+  ready:    "var(--text-muted)",
+  preparing: "var(--s-waiting, #f59e0b)",
+  running:  "var(--s-running, #3b82f6)",
+  judging:  "var(--s-running, #3b82f6)",
+  complete: "var(--s-done)",
+  failed:   "var(--s-failed)",
+};
+
+interface ArenaHeaderProps {
+  phase: BadgePhase;
+}
+
+export default function ArenaHeader({ phase }: ArenaHeaderProps) {
+  const dotColor = BADGE_COLOR[phase];
+  const label = BADGE_LABEL[phase];
+
   return (
     <header
       style={{
@@ -122,7 +155,7 @@ export default function ArenaHeader() {
               width: 6,
               height: 6,
               borderRadius: "50%",
-              background: "var(--s-done)",
+              background: dotColor,
               display: "inline-block",
             }}
           />
@@ -135,7 +168,7 @@ export default function ArenaHeader() {
               textTransform: "uppercase",
             }}
           >
-            Battle complete
+            {label}
           </span>
         </div>
       </div>

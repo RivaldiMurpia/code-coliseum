@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import ArenaHeader from "@/components/ArenaHeader";
+import ArenaHeader, { type BadgePhase } from "@/components/ArenaHeader";
 import BattleForm from "@/components/BattleForm";
 import ContenderGrid from "@/components/ContenderGrid";
 import GauntletPanel from "@/components/GauntletPanel";
@@ -264,6 +264,44 @@ function makeInitialRunningState(featureRequest: string): BattleState {
   };
 }
 
+// ─── Derive badge phase from BattleState ─────────────────────────────────────
+
+function deriveBadgePhase(battle: BattleState): BadgePhase {
+  if (battle.phase === "idle") {
+    return battle.error ? "failed" : "ready";
+  }
+  if (battle.phase === "complete") {
+    // A FAILED backend battle lands here with all contenders having failed status
+    const allFailed =
+      battle.contenders.length > 0 &&
+      battle.contenders.every((c) => c.status === "failed");
+    return allFailed ? "failed" : "complete";
+  }
+  // phase === "running"
+  const terminalStatuses = new Set<ContenderState["status"]>([
+    "survived",
+    "eliminated",
+    "failed",
+    "entering-gauntlet",
+  ]);
+  const allTerminal =
+    battle.contenders.length > 0 &&
+    battle.contenders.every((c) => terminalStatuses.has(c.status));
+  if (allTerminal) return "judging";
+
+  const provisioningStatuses = new Set<ContenderState["status"]>([
+    "waiting",
+    "preparing",
+    "ready",
+  ]);
+  const anyProvisioning = battle.contenders.some((c) =>
+    provisioningStatuses.has(c.status)
+  );
+  if (anyProvisioning) return "preparing";
+
+  return "running";
+}
+
 // ─── Idle initial state ───────────────────────────────────────────────────────
 
 const IDLE_STATE: BattleState = {
@@ -408,7 +446,7 @@ export default function Home() {
         background: "var(--bg-base)",
       }}
     >
-      <ArenaHeader />
+      <ArenaHeader phase={deriveBadgePhase(battle)} />
 
       <main style={{ flex: 1 }}>
         <BattleForm
