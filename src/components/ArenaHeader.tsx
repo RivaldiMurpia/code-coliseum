@@ -17,9 +17,9 @@ const BADGE_LABEL: Record<BadgePhase, string> = {
 
 const BADGE_COLOR: Record<BadgePhase, string> = {
   ready:    "var(--text-muted)",
-  preparing: "var(--s-waiting, #f59e0b)",
+  preparing: "var(--s-running, #3b82f6)",
   running:  "var(--s-running, #3b82f6)",
-  judging:  "var(--s-running, #3b82f6)",
+  judging:  "var(--c-sprinter, #f59e0b)",
   complete: "var(--s-done)",
   failed:   "var(--s-failed)",
 };
@@ -43,12 +43,12 @@ export default function ArenaHeader({ phase }: ArenaHeaderProps) {
         style={{
           maxWidth: 1200,
           margin: "0 auto",
-          padding: "0 24px",
+          padding: `0 ${"var(--space-lg)"}`,
           height: 60,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 16,
+          gap: "var(--space-lg)",
         }}
       >
         {/* Wordmark */}
@@ -143,20 +143,22 @@ export default function ArenaHeader({ phase }: ArenaHeaderProps) {
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 6,
-            padding: "4px 10px",
+            gap: 8,
+            padding: "5px 12px",
             borderRadius: 20,
             border: "1px solid var(--border-default)",
             background: "var(--bg-raised)",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
           }}
         >
           <span
             style={{
-              width: 6,
-              height: 6,
+              width: 7,
+              height: 7,
               borderRadius: "50%",
               background: dotColor,
               display: "inline-block",
+              boxShadow: `0 0 6px ${dotColor}80`,
             }}
           />
           <span
@@ -164,8 +166,9 @@ export default function ArenaHeader({ phase }: ArenaHeaderProps) {
               fontSize: 11,
               fontFamily: "var(--font-geist-mono, monospace)",
               color: "var(--text-secondary)",
-              letterSpacing: "0.04em",
+              letterSpacing: "0.05em",
               textTransform: "uppercase",
+              fontWeight: 600,
             }}
           >
             {label}

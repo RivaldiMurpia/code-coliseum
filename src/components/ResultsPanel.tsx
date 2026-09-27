@@ -147,6 +147,8 @@ function DistinctionBadge({ d }: { d: Distinction }) {
 
 /* ─── General comparison table ──────────────────────────────────────────── */
 function ComparisonTable({ contenders }: { contenders: ContenderState[] }) {
+  const hasEliminated = contenders.some(c => c.status === "eliminated" || c.status === "failed");
+
   return (
     <div
       style={{
@@ -179,6 +181,7 @@ function ComparisonTable({ contenders }: { contenders: ContenderState[] }) {
         </div>
         {contenders.map((c) => {
           const isElim = c.status === "eliminated" || c.status === "failed";
+          const isSurvived = c.status === "survived";
           return (
             <div
               key={c.id}
@@ -189,6 +192,7 @@ function ComparisonTable({ contenders }: { contenders: ContenderState[] }) {
                 alignItems: "center",
                 gap: 6,
                 opacity: isElim ? 0.55 : 1,
+                background: isSurvived ? `${ROLE_COLOR[c.id]}08` : "transparent",
               }}
             >
               <span style={{ fontSize: 12, color: ROLE_COLOR[c.id] }}>
@@ -204,6 +208,24 @@ function ComparisonTable({ contenders }: { contenders: ContenderState[] }) {
               >
                 {c.label}
               </span>
+              {isSurvived && (
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    fontSize: 9,
+                    fontFamily: "var(--font-geist-mono, monospace)",
+                    color: "var(--s-done)",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    padding: "1px 6px",
+                    borderRadius: 3,
+                    background: "rgba(34,197,94,0.12)",
+                    border: "1px solid rgba(34,197,94,0.25)",
+                  }}
+                >
+                  SURVIVED
+                </span>
+              )}
               {isElim && (
                 <span
                   style={{
@@ -218,7 +240,7 @@ function ComparisonTable({ contenders }: { contenders: ContenderState[] }) {
                     padding: "1px 5px",
                   }}
                 >
-                  elim.
+                  ELIMINATED
                 </span>
               )}
             </div>
@@ -298,6 +320,22 @@ function ComparisonTable({ contenders }: { contenders: ContenderState[] }) {
           </div>
         );
       })}
+      {hasEliminated && (
+        <div
+          style={{
+            padding: "10px 16px",
+            borderTop: "1px solid var(--border-default)",
+            background: "var(--bg-surface)",
+            fontSize: 10,
+            fontFamily: "var(--font-geist-mono, monospace)",
+            color: "var(--text-muted)",
+            letterSpacing: "0.04em",
+            textAlign: "right",
+          }}
+        >
+          Eliminated contenders shown at reduced opacity. Best metrics only highlight survivors.
+        </div>
+      )}
     </div>
   );
 }
@@ -749,6 +787,10 @@ function ContenderActions({
           const icon = ROLE_ICON[c.id];
           const eliminated = isEliminated(c);
           const survivor = isSurvivor(c);
+          const isSelected = selectedContenderId === c.id && survivor;
+          const isApplying = applyingId === c.id;
+          const hasApplied = applySuccess !== null && isSelected;
+
           return (
             <div
               key={c.id}
@@ -757,7 +799,11 @@ function ContenderActions({
                 alignItems: "center",
                 gap: 10,
                 flexWrap: "wrap",
-                opacity: eliminated ? 0.7 : 1,
+                opacity: eliminated ? 0.6 : 1,
+                padding: "8px 10px",
+                borderRadius: "var(--radius-sm)",
+                background: isSelected ? `${color}0d` : eliminated ? "var(--bg-surface)" : "transparent",
+                border: isSelected ? `1px solid ${color}30` : eliminated ? "1px solid rgba(239,68,68,0.15)" : "none",
               }}
             >
               {/* Identity */}
@@ -766,7 +812,7 @@ function ContenderActions({
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
-                  minWidth: 120,
+                  minWidth: 130,
                 }}
               >
                 <span style={{ color: eliminated ? "var(--text-muted)" : color, fontSize: 13 }}>{icon}</span>
@@ -788,15 +834,16 @@ function ContenderActions({
                       color: "var(--s-failed)",
                       letterSpacing: "0.06em",
                       textTransform: "uppercase",
-                      border: "1px solid var(--s-failed)40",
-                      borderRadius: 3,
-                      padding: "1px 5px",
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: "rgba(239,68,68,0.12)",
+                      border: "1px solid rgba(239,68,68,0.25)",
                     }}
                   >
                     ELIMINATED
                   </span>
                 )}
-                {survivor && selectedContenderId === c.id && (
+                {survivor && !eliminated && isSelected && (
                   <span
                     style={{
                       color,
@@ -804,23 +851,27 @@ function ContenderActions({
                       fontSize: 9,
                       fontWeight: 700,
                       letterSpacing: "0.06em",
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: `${color}15`,
+                      border: `1px solid ${color}30`,
                     }}
                   >
-                    SELECTED FOR MERGE
+                    SELECTED
                   </span>
                 )}
               </div>
 
               {/* Actions */}
-              <div style={{ display: "flex", gap: 8 }}>
-                {/* Inspect Diff */}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {/* Inspect Diff - always available for completed contenders */}
                 <button
                   type="button"
                   disabled={!battleId || loadingId === c.id}
                   onClick={() => inspectDiff(c)}
                   style={{
-                    height: 32,
-                    padding: "0 14px",
+                    height: 34,
+                    padding: "0 16px",
                     borderRadius: "var(--radius-sm)",
                     border: "1px solid var(--border-default)",
                     background: "var(--bg-raised)",
@@ -836,6 +887,7 @@ function ContenderActions({
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
+                    transition: "background 0.15s, border-color 0.15s",
                   }}
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -844,67 +896,90 @@ function ContenderActions({
                   {loadingId === c.id ? "Loading..." : "Inspect Diff"}
                 </button>
 
-                {/* Choose Candidate - only for survivors */}
-                {survivor && (
+                {/* Choose Candidate - only for survivors, not eliminated */}
+                {survivor && !eliminated && (
                   <button
                     type="button"
-                    disabled={!battleId || selectingId !== null}
+                    disabled={!battleId || selectingId !== null || hasApplied}
                     onClick={() => void selectContender(c)}
                     style={{
-                      height: 32,
-                      padding: "0 14px",
+                      height: 34,
+                      padding: "0 16px",
                       borderRadius: "var(--radius-sm)",
                       border: `1px solid ${color}50`,
-                      background: `${color}10`,
-                      color,
+                      background: isSelected ? color : `${color}10`,
+                      color: isSelected ? "#fff" : color,
                       fontFamily: "var(--font-geist-mono, monospace)",
                       fontSize: 11,
                       fontWeight: 700,
-                    letterSpacing: "0.04em",
-                    cursor: !battleId || selectingId !== null ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  {selectingId === c.id
-                    ? "Selecting..."
-                    : selectedContenderId === c.id
-                    ? "✓ Selected"
-                    : "Choose Candidate"}
-                </button>
-              )}
+                      letterSpacing: "0.04em",
+                      cursor: (!battleId || selectingId !== null || hasApplied) ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      transition: "background 0.15s, color 0.15s",
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {selectingId === c.id
+                      ? "Selecting..."
+                      : isSelected
+                      ? "✓ Selected"
+                      : "Choose Candidate"}
+                  </button>
+                )}
 
-                {/* Apply Candidate */}
-                {selectedContenderId === c.id && (
+                {/* Apply Candidate - show different states */}
+                {isSelected && (
                   <button
                     type="button"
-                    disabled={!battleId || applyingId !== null}
+                    disabled={!battleId || applyingId !== null || hasApplied}
                     onClick={() => void applyContender(c)}
                     style={{
-                      height: 32,
-                      padding: "0 14px",
+                      height: 34,
+                      padding: "0 16px",
                       borderRadius: "var(--radius-sm)",
-                      border: `1px solid ${color}`,
-                      background: color,
+                      border: hasApplied ? `1px solid var(--s-done)` : `1px solid ${color}`,
+                      background: hasApplied
+                        ? "var(--s-done)"
+                        : isApplying
+                        ? `${color}dd`
+                        : color,
                       color: "#fff",
                       fontFamily: "var(--font-geist-mono, monospace)",
                       fontSize: 11,
                       fontWeight: 700,
                       letterSpacing: "0.04em",
-                      cursor: !battleId || applyingId !== null ? "not-allowed" : "pointer",
+                      cursor: (!battleId || applyingId !== null || hasApplied) ? "not-allowed" : "pointer",
                       display: "flex",
                       alignItems: "center",
                       gap: 6,
+                      opacity: hasApplied ? 0.7 : 1,
+                      transition: "background 0.15s, opacity 0.15s",
                     }}
                   >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                      <path d="M10 2L2 10M2 2l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    {applyingId === c.id ? "Applying..." : "Apply Candidate"}
+                    {hasApplied ? (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                          <path d="M3 6l2 2 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        Applied
+                      </>
+                    ) : isApplying ? (
+                      <>
+                        <SpinnerIcon size={12} />
+                        Applying…
+                      </>
+                    ) : (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                          <path d="M10 2L2 10M2 2l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        Apply Candidate
+                      </>
+                    )}
                   </button>
                 )}
               </div>
@@ -912,7 +987,7 @@ function ContenderActions({
           );
         })}
       </div>
-      {selectedContender && (
+      {selectedContender && !applySuccess && (
         <div
           style={{
             paddingTop: 12,
@@ -947,6 +1022,41 @@ function ContenderActions({
           </span>
         </div>
       )}
+      {applySuccess && selectedContender && (
+        <div
+          style={{
+            paddingTop: 12,
+            borderTop: "1px solid var(--s-done)30",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            padding: "16px",
+            borderRadius: "var(--radius-md)",
+            background: "rgba(34,197,94,0.05)",
+            border: "1px solid rgba(34,197,94,0.2)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span
+              style={{
+                fontSize: 10,
+                fontFamily: "var(--font-geist-mono, monospace)",
+                fontWeight: 700,
+                color: "var(--s-done)",
+                letterSpacing: "0.1em",
+              }}
+            >
+              ✓ APPLIED
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>
+              {selectedContender.label} applied to working tree
+            </span>
+          </div>
+          <span style={{ color: "var(--text-secondary)" }}>
+            {applySuccess.filesChanged} file{applySuccess.filesChanged === 1 ? "" : "s"} applied · Ready to commit
+          </span>
+        </div>
+      )}
       {diffData && diffContender && (
         <DiffModal
           contender={diffContender}
@@ -958,6 +1068,35 @@ function ContenderActions({
         />
       )}
     </div>
+  );
+}
+
+function SpinnerIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 14 14"
+      fill="none"
+      aria-hidden="true"
+      style={{ animation: "spin 1s linear infinite" }}
+    >
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <circle
+        cx="7"
+        cy="7"
+        r="5.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeOpacity="0.3"
+      />
+      <path
+        d="M7 1.5A5.5 5.5 0 0 1 12.5 7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 
@@ -978,6 +1117,7 @@ export default function ResultsPanel({
   onSelect,
 }: ResultsPanelProps) {
   const survivors = contenders.filter((c) => c.status === "survived");
+  const eliminated = contenders.filter((c) => c.status === "eliminated" || c.status === "failed");
   const completed = contenders.filter(
     (c) => c.status === "survived" || c.status === "eliminated" || c.status === "failed"
   );
@@ -1026,7 +1166,75 @@ export default function ResultsPanel({
           </div>
         )}
 
-        {/* ── Survivors note ── */}
+        {/* ── Survivors / Elimination Summary ── */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 12,
+            marginBottom: 20,
+          }}
+        >
+          {survivors.length > 0 && (
+            <div
+              style={{
+                padding: "12px 16px",
+                borderRadius: "var(--radius-md)",
+                background: "rgba(34,197,94,0.08)",
+                border: "1px solid rgba(34,197,94,0.25)",
+                fontSize: 12,
+                color: "var(--s-done)",
+                fontFamily: "var(--font-geist-mono, monospace)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flex: 1,
+                minWidth: 240,
+              }}
+            >
+              <span style={{ fontSize: 14 }}>✓</span>
+              <span style={{ fontWeight: 600 }}>
+                {survivors.length === 1
+                  ? "1 contender survived"
+                  : `${survivors.length} contenders survived`}
+                {" — "}
+                {survivors.length === 1
+                  ? "it is a valid candidate"
+                  : "all are valid candidates"}
+              </span>
+            </div>
+          )}
+          {eliminated.length > 0 && (
+            <div
+              style={{
+                padding: "12px 16px",
+                borderRadius: "var(--radius-md)",
+                background: "rgba(239,68,68,0.08)",
+                border: "1px solid rgba(239,68,68,0.25)",
+                fontSize: 12,
+                color: "var(--s-failed)",
+                fontFamily: "var(--font-geist-mono, monospace)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flex: 1,
+                minWidth: 240,
+              }}
+            >
+              <span style={{ fontSize: 14 }}>✕</span>
+              <span style={{ fontWeight: 600 }}>
+                {eliminated.length === 1
+                  ? "1 contender eliminated"
+                  : `${eliminated.length} contenders eliminated`}
+                {" — "}
+                {eliminated.length === 1
+                  ? "failed Gauntlet checks"
+                  : "failed Gauntlet checks"}
+              </span>
+            </div>
+          )}
+        </div>
+
         {survivors.length > 0 && (
           <div
             style={{
@@ -1040,12 +1248,7 @@ export default function ResultsPanel({
               fontFamily: "var(--font-geist-mono, monospace)",
             }}
           >
-            {survivors.length === 1
-              ? "1 contender survived the Gauntlet — it is a valid candidate."
-              : survivors.length === 2
-              ? "2 contenders survived the Gauntlet — both are valid candidates."
-              : `${survivors.length} contenders survived the Gauntlet — all are valid candidates.`}{" "}
-            Review the diff before choosing one.
+            Review the diff below before choosing a candidate to apply.
           </div>
         )}
 
