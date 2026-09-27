@@ -47,6 +47,7 @@ Code Coliseum changes the workflow from:
 Prompt → AI → Accept
 
 into:
+
 Feature Request
       ↓
 3 Competing IBM Bob Agents
@@ -105,6 +106,7 @@ automatic elimination rules.
 Real Git Isolation
 Every battle starts from the same Git commit.
 Code Coliseum creates three isolated Git worktrees:
+
 main repository
       │
       ├── Minimalist worktree
@@ -116,6 +118,7 @@ This prevents contenders from seeing or modifying each other's implementation.
 Parallel IBM Bob Execution
 Once the isolated workspaces are prepared, all surviving contenders are
 launched concurrently.
+
              ┌─ Minimalist ─┐
 Feature ─────┼─ Sprinter ───┼──→ Gauntlet
 Request      └─ Architect ──┘
@@ -139,6 +142,7 @@ Developer-Controlled Selection
 Code Coliseum never automatically declares a winner.
 After reviewing the evidence and source code, the developer explicitly chooses
 one surviving contender.
+
 Minimalist
 [ Inspect Diff ] [ ✓ Selected ]
 
@@ -166,10 +170,12 @@ It does not automatically:
 The final Git commit remains developer-controlled.
 Example Battle
 Feature request:
+
 Add a GET /api/health endpoint that returns JSON with status set to ok.
 Do not add dependencies.
 
 Example result:
+
               Minimalist    Sprinter    Architect
 
 Gauntlet       SURVIVED      SURVIVED    SURVIVED
@@ -180,6 +186,7 @@ All three implementations are valid.
 Code Coliseum then lets the developer inspect the actual code and choose which
 implementation should be applied.
 Architecture
+
                          CODE COLISEUM
 
 Feature Request
@@ -220,7 +227,7 @@ Feature Request
            ▼
   Developer Working Tree
 
-Tech Stack
+  Tech Stack
 - IBM Bob
 - Next.js 16
 - React
@@ -240,23 +247,18 @@ Requirements
 - valid BOB_API_KEY
 Install dependencies:
 npm install
-
 Set the Bob API key in your environment.
 On PowerShell:
 $env:BOB_API_KEY = "YOUR_API_KEY"
-
 Start Code Coliseum:
-npm run dev -- --port 3001
-
+npm run dev -- --port 3000
 Open:
-http://localhost:3001
-
+http://localhost:3000
 Validation
 The project currently passes:
 npx tsc --noEmit
 npm run lint
 npm run build
-
 Current Status
 Code Coliseum MVP currently supports:
 - isolated contender worktrees
