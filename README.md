@@ -18,6 +18,25 @@ The developer can inspect the actual Git diff, compare evidence, choose a candid
 
 ---
 
+<<<<<<< HEAD
+=======
+## 🎬 Demo
+
+### Three agents enter the arena
+
+![Code Coliseum battle overview](docs/screenshots/arena-overview.webp)
+
+*Three IBM Bob contenders independently implement the same feature and survive only after passing every mandatory Gauntlet check.*
+
+### The developer decides what earns the merge
+
+![Code Coliseum applied candidate](docs/screenshots/applied-candidate.webp)
+
+*After reviewing real Git evidence, the developer selects a surviving contender and applies that exact implementation to the main working tree.*
+
+---
+
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 ## 🎯 The Problem
 
 AI coding agents are increasingly capable of producing working code.
@@ -611,8 +630,11 @@ Example body:
 }
 ```
 
+<<<<<<< HEAD
 ---
 
+=======
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 ### Run Battle
 
 ```http
@@ -621,10 +643,13 @@ POST /api/battles/:battleId/run
 
 Starts provisioning and Bob execution.
 
+<<<<<<< HEAD
 The request returns before the full battle completes.
 
 ---
 
+=======
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 ### Read Battle State
 
 ```http
@@ -633,8 +658,11 @@ GET /api/battles/:battleId
 
 Returns live contender state, Gauntlet results, metrics, and developer selection state.
 
+<<<<<<< HEAD
 ---
 
+=======
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 ### Inspect Contender Diff
 
 ```http
@@ -643,8 +671,11 @@ GET /api/battles/:battleId/contenders/:contenderId/diff
 
 Returns the real unified Git patch for a contender.
 
+<<<<<<< HEAD
 ---
 
+=======
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 ### Choose Candidate
 
 ```http
@@ -659,8 +690,11 @@ Example:
 }
 ```
 
+<<<<<<< HEAD
 ---
 
+=======
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 ### Apply Candidate
 
 ```http
@@ -675,8 +709,11 @@ No commit is created automatically.
 
 # 🛠️ Tech Stack
 
+<<<<<<< HEAD
 Code Coliseum currently uses:
 
+=======
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 - **IBM Bob**
 - **IBM Bob Shell**
 - **Next.js 16**
@@ -691,44 +728,65 @@ Code Coliseum currently uses:
 
 The current MVP intentionally avoids unnecessary infrastructure.
 
+<<<<<<< HEAD
 No database is required.
 
 Battle state is currently stored in memory.
+=======
+No database is required. Battle state is currently stored in memory.
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 
 ---
 
 # 💻 Running Locally
 
 ## Requirements
+<<<<<<< HEAD
 
 Before starting Code Coliseum, install:
+=======
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 
 - Node.js
 - npm
 - Git
 - IBM Bob Shell
+<<<<<<< HEAD
 
 You also need a valid IBM Bob API key.
 
 ---
+=======
+- a valid `BOB_API_KEY`
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 
 ## 1. Clone the repository
 
 ```bash
+<<<<<<< HEAD
 git clone <YOUR_REPOSITORY_URL>
 cd code-coliseum
 ```
 
 ---
 
+=======
+git clone https://github.com/RivaldiMurpia/code-coliseum.git
+cd code-coliseum
+```
+
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 ## 2. Install dependencies
 
 ```bash
 npm install
 ```
 
+<<<<<<< HEAD
 ---
 
+=======
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 ## 3. Configure IBM Bob
 
 Make sure IBM Bob Shell is installed and available:
@@ -737,8 +795,11 @@ Make sure IBM Bob Shell is installed and available:
 bob --version
 ```
 
+<<<<<<< HEAD
 A valid `BOB_API_KEY` must exist in the environment.
 
+=======
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 ### PowerShell — current terminal only
 
 ```powershell
@@ -747,8 +808,11 @@ $env:BOB_API_KEY = "YOUR_API_KEY"
 
 ### PowerShell — Windows user environment
 
+<<<<<<< HEAD
 To make the key available to newly opened terminals:
 
+=======
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 ```powershell
 [System.Environment]::SetEnvironmentVariable(
     "BOB_API_KEY",
@@ -759,9 +823,13 @@ To make the key available to newly opened terminals:
 
 Restart your terminal or IDE after setting a persistent environment variable.
 
+<<<<<<< HEAD
 Do not commit API keys to the repository.
 
 ---
+=======
+**Do not commit API keys to the repository.**
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 
 ## 4. Start Code Coliseum
 
@@ -787,6 +855,7 @@ npm run lint
 npm run build
 ```
 
+<<<<<<< HEAD
 Some server routes intentionally use dynamic filesystem and Git operations because Code Coliseum manages real local Git worktrees.
 
 ---
@@ -832,6 +901,8 @@ src/
         └── types.ts
 ```
 
+=======
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 ---
 
 # ✅ Current MVP Status
@@ -840,6 +911,7 @@ The current Code Coliseum MVP supports:
 
 ```text
 ✓ Feature request submission
+<<<<<<< HEAD
 
 ✓ Three IBM Bob contender personas
 
@@ -877,6 +949,26 @@ The current Code Coliseum MVP supports:
 
 ✓ Stale-battle protection
 
+=======
+✓ Three IBM Bob contender personas
+✓ Isolated Git worktrees
+✓ Parallel IBM Bob execution
+✓ Real execution lifecycle
+✓ Dependency provisioning
+✓ Deterministic Gauntlet validation
+✓ Dependency integrity checks
+✓ Type-safety validation
+✓ Production-build validation
+✓ Runtime acceptance testing
+✓ Real Git metrics
+✓ Tracked-file detection
+✓ Untracked-file detection
+✓ Unified Git diff inspection
+✓ Developer-controlled candidate selection
+✓ Apply selected implementation to main working tree
+✓ Dirty-tree protection
+✓ Stale-battle protection
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 ✓ No automatic commit or push
 ```
 
@@ -884,10 +976,13 @@ The current Code Coliseum MVP supports:
 
 # 🚧 Current MVP Limitations
 
+<<<<<<< HEAD
 Code Coliseum is currently designed as a hackathon MVP.
 
 Current limitations include:
 
+=======
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
 - battle state is in-memory
 - battles are not persisted across server restarts
 - current acceptance testing is designed around the demo scenario
@@ -965,4 +1060,8 @@ into one developer workflow.
 
 ### Evidence decides what survives.
 
+<<<<<<< HEAD
 ### The developer decides what earns the merge.
+=======
+### The developer decides what earns the merge.
+>>>>>>> 0c14b5edd6554eb3973ba191c68d84ab6125aac5
