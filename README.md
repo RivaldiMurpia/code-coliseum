@@ -18,6 +18,22 @@ The developer can inspect the actual Git diff, compare evidence, choose a candid
 
 ---
 
+## 🎬 Demo
+
+### Three agents enter the arena
+
+![Code Coliseum battle overview](docs/screenshots/arena-overview.webp)
+
+*Three IBM Bob contenders independently implement the same feature and survive only after passing every mandatory Gauntlet check.*
+
+### The developer decides what earns the merge
+
+![Code Coliseum applied candidate](docs/screenshots/applied-candidate.webp)
+
+*After reviewing real Git evidence, the developer selects a surviving contender and applies that exact implementation to the main working tree.*
+
+---
+
 ## 🎯 The Problem
 
 AI coding agents are increasingly capable of producing working code.
@@ -611,8 +627,6 @@ Example body:
 }
 ```
 
----
-
 ### Run Battle
 
 ```http
@@ -620,10 +634,6 @@ POST /api/battles/:battleId/run
 ```
 
 Starts provisioning and Bob execution.
-
-The request returns before the full battle completes.
-
----
 
 ### Read Battle State
 
@@ -633,8 +643,6 @@ GET /api/battles/:battleId
 
 Returns live contender state, Gauntlet results, metrics, and developer selection state.
 
----
-
 ### Inspect Contender Diff
 
 ```http
@@ -642,8 +650,6 @@ GET /api/battles/:battleId/contenders/:contenderId/diff
 ```
 
 Returns the real unified Git patch for a contender.
-
----
 
 ### Choose Candidate
 
@@ -659,8 +665,6 @@ Example:
 }
 ```
 
----
-
 ### Apply Candidate
 
 ```http
@@ -674,8 +678,6 @@ No commit is created automatically.
 ---
 
 # 🛠️ Tech Stack
-
-Code Coliseum currently uses:
 
 - **IBM Bob**
 - **IBM Bob Shell**
@@ -691,9 +693,7 @@ Code Coliseum currently uses:
 
 The current MVP intentionally avoids unnecessary infrastructure.
 
-No database is required.
-
-Battle state is currently stored in memory.
+No database is required. Battle state is currently stored in memory.
 
 ---
 
@@ -701,33 +701,24 @@ Battle state is currently stored in memory.
 
 ## Requirements
 
-Before starting Code Coliseum, install:
-
 - Node.js
 - npm
 - Git
 - IBM Bob Shell
-
-You also need a valid IBM Bob API key.
-
----
+- a valid `BOB_API_KEY`
 
 ## 1. Clone the repository
 
 ```bash
-git clone <YOUR_REPOSITORY_URL>
+git clone https://github.com/RivaldiMurpia/code-coliseum.git
 cd code-coliseum
 ```
-
----
 
 ## 2. Install dependencies
 
 ```bash
 npm install
 ```
-
----
 
 ## 3. Configure IBM Bob
 
@@ -737,8 +728,6 @@ Make sure IBM Bob Shell is installed and available:
 bob --version
 ```
 
-A valid `BOB_API_KEY` must exist in the environment.
-
 ### PowerShell — current terminal only
 
 ```powershell
@@ -746,8 +735,6 @@ $env:BOB_API_KEY = "YOUR_API_KEY"
 ```
 
 ### PowerShell — Windows user environment
-
-To make the key available to newly opened terminals:
 
 ```powershell
 [System.Environment]::SetEnvironmentVariable(
@@ -759,9 +746,7 @@ To make the key available to newly opened terminals:
 
 Restart your terminal or IDE after setting a persistent environment variable.
 
-Do not commit API keys to the repository.
-
----
+**Do not commit API keys to the repository.**
 
 ## 4. Start Code Coliseum
 
@@ -787,51 +772,6 @@ npm run lint
 npm run build
 ```
 
-Some server routes intentionally use dynamic filesystem and Git operations because Code Coliseum manages real local Git worktrees.
-
----
-
-# 📁 Important Project Areas
-
-```text
-src/
-├── app/
-│   ├── api/
-│   │   └── battles/
-│   │       ├── route.ts
-│   │       └── [battleId]/
-│   │           ├── route.ts
-│   │           ├── run/
-│   │           ├── select/
-│   │           ├── apply/
-│   │           └── contenders/
-│   │               └── [contenderId]/
-│   │                   └── diff/
-│   │
-│   └── page.tsx
-│
-├── components/
-│   ├── ArenaHeader.tsx
-│   ├── BattleForm.tsx
-│   ├── ContenderCard.tsx
-│   ├── ContenderGrid.tsx
-│   ├── GauntletPanel.tsx
-│   └── ResultsPanel.tsx
-│
-└── lib/
-    └── coliseum/
-        ├── battle-orchestrator.ts
-        ├── battle-store.ts
-        ├── bob-runner.ts
-        ├── gauntlet.ts
-        ├── git-evidence.ts
-        ├── git.ts
-        ├── metrics.ts
-        ├── prompts.ts
-        ├── provisioner.ts
-        └── types.ts
-```
-
 ---
 
 # ✅ Current MVP Status
@@ -840,53 +780,30 @@ The current Code Coliseum MVP supports:
 
 ```text
 ✓ Feature request submission
-
 ✓ Three IBM Bob contender personas
-
 ✓ Isolated Git worktrees
-
 ✓ Parallel IBM Bob execution
-
 ✓ Real execution lifecycle
-
 ✓ Dependency provisioning
-
 ✓ Deterministic Gauntlet validation
-
 ✓ Dependency integrity checks
-
 ✓ Type-safety validation
-
 ✓ Production-build validation
-
 ✓ Runtime acceptance testing
-
 ✓ Real Git metrics
-
 ✓ Tracked-file detection
-
 ✓ Untracked-file detection
-
 ✓ Unified Git diff inspection
-
 ✓ Developer-controlled candidate selection
-
 ✓ Apply selected implementation to main working tree
-
 ✓ Dirty-tree protection
-
 ✓ Stale-battle protection
-
 ✓ No automatic commit or push
 ```
 
 ---
 
 # 🚧 Current MVP Limitations
-
-Code Coliseum is currently designed as a hackathon MVP.
-
-Current limitations include:
 
 - battle state is in-memory
 - battles are not persisted across server restarts
