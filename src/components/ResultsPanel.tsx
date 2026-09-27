@@ -473,14 +473,14 @@ function DiffModal({
   );
 }
 
-/* ─── Survivor actions ──────────────────────────────────────────────────── */
-function SurvivorActions({
-  survivors,
+/* ─── Contender actions ──────────────────────────────────────────────────── */
+function ContenderActions({
+  contenders,
   battleId,
   selectedContenderId,
   onSelect,
 }: {
-  survivors: ContenderState[];
+  contenders: ContenderState[];
   battleId: string | null;
   selectedContenderId?: ContenderRole;
   onSelect: (contenderId: ContenderRole) => void;
@@ -494,6 +494,9 @@ function SurvivorActions({
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applySuccess, setApplySuccess] = useState<{ filesChanged: number; files: string[] } | null>(null);
+
+  const isSurvivor = (c: ContenderState) => c.status === "survived";
+  const isEliminated = (c: ContenderState) => c.status === "eliminated" || c.status === "failed";
 
   async function inspectDiff(contender: ContenderState) {
     if (!battleId) return;
@@ -598,9 +601,11 @@ function SurvivorActions({
     }
   }
 
-  const selectedContender = survivors.find((c) => c.id === selectedContenderId);
+  const selectedContender = contenders.find(
+    (c) => c.id === selectedContenderId && c.status === "survived"
+  );
 
-  if (survivors.length === 0) {
+  if (contenders.length === 0) {
     return (
       <div
         style={{
@@ -634,7 +639,7 @@ function SurvivorActions({
             fontFamily: "var(--font-geist-mono, monospace)",
           }}
         >
-          No contenders survived the Gauntlet — none can be selected.
+          No contenders completed — none available for inspection.
         </div>
       </div>
     );
@@ -739,9 +744,11 @@ function SurvivorActions({
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {survivors.map((c) => {
+        {contenders.map((c) => {
           const color = ROLE_COLOR[c.id];
           const icon = ROLE_ICON[c.id];
+          const eliminated = isEliminated(c);
+          const survivor = isSurvivor(c);
           return (
             <div
               key={c.id}
@@ -750,6 +757,7 @@ function SurvivorActions({
                 alignItems: "center",
                 gap: 10,
                 flexWrap: "wrap",
+                opacity: eliminated ? 0.7 : 1,
               }}
             >
               {/* Identity */}
@@ -761,17 +769,34 @@ function SurvivorActions({
                   minWidth: 120,
                 }}
               >
-                <span style={{ color, fontSize: 13 }}>{icon}</span>
+                <span style={{ color: eliminated ? "var(--text-muted)" : color, fontSize: 13 }}>{icon}</span>
                 <span
                   style={{
                     fontSize: 12,
                     fontWeight: 600,
-                    color: "var(--text-primary)",
+                    color: eliminated ? "var(--text-secondary)" : "var(--text-primary)",
                   }}
                 >
                   {c.label}
                 </span>
-                {selectedContenderId === c.id && (
+                {eliminated && (
+                  <span
+                    style={{
+                      marginLeft: "auto",
+                      fontSize: 9,
+                      fontFamily: "var(--font-geist-mono, monospace)",
+                      color: "var(--s-failed)",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      border: "1px solid var(--s-failed)40",
+                      borderRadius: 3,
+                      padding: "1px 5px",
+                    }}
+                  >
+                    ELIMINATED
+                  </span>
+                )}
+                {survivor && selectedContenderId === c.id && (
                   <span
                     style={{
                       color,
@@ -819,21 +844,22 @@ function SurvivorActions({
                   {loadingId === c.id ? "Loading..." : "Inspect Diff"}
                 </button>
 
-                {/* Choose Candidate */}
-                <button
-                  type="button"
-                  disabled={!battleId || selectingId !== null}
-                  onClick={() => void selectContender(c)}
-                  style={{
-                    height: 32,
-                    padding: "0 14px",
-                    borderRadius: "var(--radius-sm)",
-                    border: `1px solid ${color}50`,
-                    background: `${color}10`,
-                    color,
-                    fontFamily: "var(--font-geist-mono, monospace)",
-                    fontSize: 11,
-                    fontWeight: 700,
+                {/* Choose Candidate - only for survivors */}
+                {survivor && (
+                  <button
+                    type="button"
+                    disabled={!battleId || selectingId !== null}
+                    onClick={() => void selectContender(c)}
+                    style={{
+                      height: 32,
+                      padding: "0 14px",
+                      borderRadius: "var(--radius-sm)",
+                      border: `1px solid ${color}50`,
+                      background: `${color}10`,
+                      color,
+                      fontFamily: "var(--font-geist-mono, monospace)",
+                      fontSize: 11,
+                      fontWeight: 700,
                     letterSpacing: "0.04em",
                     cursor: !battleId || selectingId !== null ? "not-allowed" : "pointer",
                     display: "flex",
@@ -850,6 +876,7 @@ function SurvivorActions({
                     ? "✓ Selected"
                     : "Choose Candidate"}
                 </button>
+              )}
 
                 {/* Apply Candidate */}
                 {selectedContenderId === c.id && (
@@ -897,7 +924,7 @@ function SurvivorActions({
         >
           <span
             style={{
-              color: ROLE_COLOR[selectedContender.id],
+              color: ROLE_COLOR[selectedContender.id as ContenderRole],
               fontFamily: "var(--font-geist-mono, monospace)",
               fontSize: 10,
               fontWeight: 700,
@@ -951,6 +978,9 @@ export default function ResultsPanel({
   onSelect,
 }: ResultsPanelProps) {
   const survivors = contenders.filter((c) => c.status === "survived");
+  const completed = contenders.filter(
+    (c) => c.status === "survived" || c.status === "eliminated" || c.status === "failed"
+  );
 
   return (
     <section style={{ padding: "0 24px 48px" }}>
@@ -1047,8 +1077,8 @@ export default function ResultsPanel({
         <ComparisonTable contenders={contenders} />
 
         {/* ── Developer actions ── */}
-        <SurvivorActions
-          survivors={survivors}
+        <ContenderActions
+          contenders={completed}
           battleId={battleId}
           selectedContenderId={selectedContenderId}
           onSelect={onSelect}
@@ -1057,3 +1087,4 @@ export default function ResultsPanel({
     </section>
   );
 }
+
