@@ -270,12 +270,15 @@ async function checkProductionBuild(
 
 /**
  * Spin up a temporary Next.js server on a free local port, wait for it to be
- * ready, then issue GET /api/health and verify:
- *   - HTTP status is 200
- *   - JSON body contains { "status": "ok" }
+ * ready, then issue POST /api/analyze-text requests and verify:
+ *   1. Valid input: POST /api/analyze-text with {text: "Bob builds better code. Bob builds fast."}
+ *      - HTTP status 200
+ *      - JSON body: {wordCount: 7, uniqueWordCount: 5, topWords: [{word:"bob",count:2},{word:"builds",count:2},{word:"better",count:1}]}
+ *   2. Invalid input: POST /api/analyze-text with {}
+ *      - HTTP status 400
  *
  * The server is always killed afterward (finally block).
- * Timeout: 3 minutes total (server startup + request).
+ * Timeout: 3 minutes total (server startup + requests).
  *
  * Port selection: random high port (49152-65535) with a bound-check retry to
  * avoid collisions between concurrently-running contenders.
@@ -285,7 +288,7 @@ async function checkAcceptanceTest(
 ): Promise<GauntletCheck> {
   const start = Date.now();
   const id = CHECK_ACCEPTANCE;
-  const name = "Acceptance Test: GET /api/health";
+  const name = "Acceptance Test: POST /api/analyze-text";
 
   let port: number;
   try {
@@ -314,28 +317,51 @@ async function checkAcceptanceTest(
       };
     }
 
-    // Make the HTTP request
-    const result = await httpGetJson(`http://localhost:${port}/api/health`, 15_000);
+    // Test 1: Valid input
+    const validResult = await httpPostJson(
+      `http://localhost:${port}/api/analyze-text`,
+      { text: "Bob builds better code. Bob builds fast." },
+      15_000
+    );
 
-    if (!result.ok) {
+    if (!validResult.ok || validResult.statusCode !== 200) {
       return {
         id, name, status: "FAIL",
         durationMs: Date.now() - start,
-        detail: `GET /api/health returned HTTP ${result.statusCode} (expected 200)`,
+        detail: `Valid POST /api/analyze-text returned HTTP ${validResult.statusCode} (expected 200)`,
       };
     }
 
-    // Verify JSON body contains { status: "ok" }
-    const body = result.body;
-    if (
-      typeof body !== "object" ||
-      body === null ||
-      (body as Record<string, unknown>)["status"] !== "ok"
-    ) {
+    const expectedValid = {
+      wordCount: 7,
+      uniqueWordCount: 5,
+      topWords: [
+        { word: "bob", count: 2 },
+        { word: "builds", count: 2 },
+        { word: "better", count: 1 },
+      ],
+    };
+
+    if (!deepEqual(validResult.body, expectedValid)) {
       return {
         id, name, status: "FAIL",
         durationMs: Date.now() - start,
-        detail: `GET /api/health body did not contain {status:"ok"}. Got: ${JSON.stringify(body)}`,
+        detail: `Valid POST /api/analyze-text body mismatch.\nExpected: ${JSON.stringify(expectedValid)}\nGot: ${JSON.stringify(validResult.body)}`,
+      };
+    }
+
+    // Test 2: Invalid input (empty object)
+    const invalidResult = await httpPostJson(
+      `http://localhost:${port}/api/analyze-text`,
+      {},
+      15_000
+    );
+
+    if (invalidResult.statusCode !== 400) {
+      return {
+        id, name, status: "FAIL",
+        durationMs: Date.now() - start,
+        detail: `Invalid POST /api/analyze-text returned HTTP ${invalidResult.statusCode} (expected 400)`,
       };
     }
 
@@ -442,26 +468,44 @@ interface HttpResult {
 }
 
 /**
- * Minimal HTTP GET using Node's built-in `http` module.
+ * Minimal HTTP POST with JSON body using Node's built-in `http` module.
  * No external dependencies.
  */
-function httpGetJson(url: string, timeoutMs: number): Promise<HttpResult> {
+function httpPostJson(
+  url: string,
+  body: unknown,
+  timeoutMs: number
+): Promise<HttpResult> {
   return new Promise<HttpResult>((resolve, reject) => {
-    const req = http.get(url, { timeout: timeoutMs }, (res) => {
+    const urlObj = new URL(url);
+    const postData = JSON.stringify(body);
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || 80,
+      path: urlObj.pathname,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(postData),
+      },
+      timeout: timeoutMs,
+    };
+
+    const req = http.request(options, (res) => {
       const chunks: Buffer[] = [];
       res.on("data", (c: Buffer) => chunks.push(c));
       res.on("end", () => {
         const raw = Buffer.concat(chunks).toString("utf8");
-        let body: unknown;
+        let responseBody: unknown;
         try {
-          body = JSON.parse(raw);
+          responseBody = JSON.parse(raw);
         } catch {
-          body = raw;
+          responseBody = raw;
         }
         resolve({
           ok: res.statusCode === 200,
           statusCode: res.statusCode ?? 0,
-          body,
+          body: responseBody,
         });
       });
       res.on("error", reject);
@@ -470,9 +514,40 @@ function httpGetJson(url: string, timeoutMs: number): Promise<HttpResult> {
     req.on("error", reject);
     req.on("timeout", () => {
       req.destroy();
-      reject(new Error(`HTTP GET ${url} timed out after ${timeoutMs}ms`));
+      reject(new Error(`HTTP POST ${url} timed out after ${timeoutMs}ms`));
     });
+
+    req.write(postData);
+    req.end();
   });
+}
+
+/**
+ * Deep equality check for JSON-serializable values.
+ * Handles objects, arrays, and primitives.
+ */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  if (typeof a !== "object" || typeof b !== "object") return false;
+
+  const arrA = Array.isArray(a);
+  const arrB = Array.isArray(b);
+  if (arrA !== arrB) return false;
+
+  if (arrA) {
+    const aArr = a as unknown[];
+    const bArr = b as unknown[];
+    if (aArr.length !== bArr.length) return false;
+    return aArr.every((v, i) => deepEqual(v, bArr[i]));
+  }
+
+  const aObj = a as Record<string, unknown>;
+  const bObj = b as Record<string, unknown>;
+  const keysA = Object.keys(aObj);
+  const keysB = Object.keys(bObj);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((k) => deepEqual(aObj[k], bObj[k]));
 }
 
 // ─── Main Gauntlet runner ─────────────────────────────────────────────────
